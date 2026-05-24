@@ -115,6 +115,14 @@ export default function ScanUI({ options }: ScanUIProps) {
             })()}
           </Box>
           {outputFile && <Text color="cyan">Report exported to {outputFile}</Text>}
+          {result.skippedDirs.filter((d) => !d.repoPath).length > 0 && (
+            <Box flexDirection="column" marginTop={1}>
+              <Text color="yellow">
+                Other skipped: {[...new Set(result.skippedDirs.filter((d) => !d.repoPath).map((d) => d.name))].join(', ')}
+              </Text>
+              <Text dimColor> (configured in ~/.git-keeper/git-keeper-settings.json)</Text>
+            </Box>
+          )}
           <Box marginTop={1}>
             <Text dimColor>Press Enter or Esc to exit</Text>
           </Box>

@@ -40,7 +40,7 @@ export async function getUntrackedFiles(cwd: string, skipIgnored = false, exclud
     args.push('--exclude-standard');
   }
   for (const dir of excludeDirs) {
-    args.push(`:(exclude)${dir}/**`);
+    args.push('--exclude', `${dir}/`);
   }
   const { stdout } = await execa('git', args, { cwd });
   return stdout.split('\n').filter(Boolean);

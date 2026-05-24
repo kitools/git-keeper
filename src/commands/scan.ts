@@ -63,7 +63,12 @@ export async function runScan(options: ScanOptions): Promise<ScanResult> {
     const entries = await collectRepoUntracked(repo, skipIgnored, seen, config.skipDirs);
     for (const entry of entries) {
       // Assign skipped dirs that belong to this repo
-      entry.skippedDirs = skippedDirs.filter((d) => d.repoPath === entry.repo);
+      entry.skippedDirs = skippedDirs
+        .filter((d) => d.repoPath === entry.repo)
+        .map((d) => ({
+          ...d,
+          name: d.path.slice(entry.repo.length + 1) + '/',
+        }));
       allRepos.push(entry);
     }
   }
