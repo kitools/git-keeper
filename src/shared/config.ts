@@ -7,7 +7,7 @@ export interface Config {
 }
 
 const DEFAULT_CONFIG: Config = {
-  skipDirs: ['node_modules'],
+  skipDirs: ['node_modules', 'target', '__pycache__', '.venv', 'venv'],
 };
 
 const CONFIG_PATH = join(homedir(), '.git-keeper', 'git-keeper-settings.json');

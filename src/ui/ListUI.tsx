@@ -1,4 +1,4 @@
-import { Box, Text, useApp, useInput } from 'ink';
+import { Box, Static, Text, useApp, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import { useEffect, useState } from 'react';
 import { runList } from '../commands/list.js';
@@ -22,10 +22,12 @@ export default function ListUI({ options }: ListUIProps) {
   const [result, setResult] = useState<{ success: boolean; files: string[]; error?: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [log, setLog] = useState<string[]>([]);
   const { exit } = useApp();
 
   useInput((_input, key) => {
     if (key.escape) exit();
+    if (key.return && (result || error)) exit();
   });
 
   useEffect(() => {
@@ -42,86 +44,81 @@ export default function ListUI({ options }: ListUIProps) {
       });
   }, [configPhase]);
 
-  if (error) {
-    return (
-      <Box flexDirection="column" padding={1}>
-        <Text color="red">Error: {error}</Text>
-        <Text dimColor>Press Esc to exit</Text>
-      </Box>
-    );
-  }
-
-  if (result) {
-    const files = result.files;
-    const displayFiles = files.slice(0, 100);
-    const remaining = files.length - displayFiles.length;
-
-    if (!result.success) {
-      return (
-        <Box flexDirection="column" padding={1}>
-          <Text color="red">Error: {result.error}</Text>
-          <Text dimColor>Press Esc to exit</Text>
-        </Box>
-      );
-    }
-
-    return (
-      <Box flexDirection="column" padding={1}>
-        <Text bold>
-          Found {files.length} untracked file{files.length !== 1 ? 's' : ''}
-          {skipIgnored ? ' (excluding git-ignored)' : ''}
-        </Text>
-        <Box flexDirection="column" marginTop={1}>
-          {displayFiles.map((file, i) => (
-            <Text key={i} dimColor>
-              {file}
-            </Text>
-          ))}
-          {remaining > 0 && <Text dimColor>... and {remaining} more (use export to see all)</Text>}
-        </Box>
-        {outputFile && <Text color="cyan">Exported to {outputFile}</Text>}
-        <Box marginTop={1}>
-          <Text dimColor>Press Esc to exit</Text>
-        </Box>
-      </Box>
-    );
-  }
-
-  if (loading) {
-    return (
-      <Box padding={1}>
-        <Spinner label="Scanning untracked files..." />
-      </Box>
-    );
-  }
-
-  if (configPhase === 'ignored') {
-    return (
-      <AskYesNo
-        label="Skip git-ignored files? (y/N)"
-        onAnswer={(val) => {
-          setSkipIgnored(val);
-          setConfigPhase(options.output === undefined ? 'output' : null);
-        }}
-      />
-    );
-  }
-
-  if (configPhase === 'output') {
-    return (
-      <Box flexDirection="column" padding={1}>
-        <Text>Export file list to file? (optional, leave empty to skip):</Text>
-        <OutputPathInput
-          onSubmit={(path) => {
-            setOutputFile(path);
-            setConfigPhase(null);
+  const dynamic = (
+    <Box flexDirection="column" padding={1}>
+      {/* Current interactive or result content */}
+      {configPhase === 'ignored' && (
+        <AskYesNo
+          label="Skip git-ignored files? (y/N)"
+          onAnswer={(val) => {
+            setSkipIgnored(val);
+            setLog((l) => [...l, `Skip git-ignored files? ${val ? 'Yes' : 'No'}`]);
+            setConfigPhase(options.output === undefined ? 'output' : null);
           }}
         />
-      </Box>
-    );
-  }
+      )}
+      {configPhase === 'output' && (
+        <Box flexDirection="column">
+          <Text>Export file list to file? (optional, leave empty to skip):</Text>
+          <OutputPathInput
+            onSubmit={(path) => {
+              setOutputFile(path);
+              setLog((l) => [...l, `Export to file: ${path || '(skipped)'}`]);
+              setConfigPhase(null);
+            }}
+          />
+        </Box>
+      )}
+      {loading && <Spinner label="Scanning untracked files..." />}
+      {error && (
+        <>
+          <Text color="red">Error: {error}</Text>
+          <Text dimColor>Press Enter or Esc to exit</Text>
+        </>
+      )}
+      {result &&
+        (result.success ? (
+          <>
+            <Box marginTop={1}>
+              <Text bold>
+                Found {result.files.length} untracked file{result.files.length !== 1 ? 's' : ''}
+                {skipIgnored ? ' (excluding git-ignored)' : ''}
+              </Text>
+            </Box>
+            <Box flexDirection="column" marginTop={1}>
+              {result.files.slice(0, 100).map((file) => (
+                <Text key={file} dimColor>
+                  {file}
+                </Text>
+              ))}
+              {result.files.length > 100 && (
+                <Text dimColor>... and {result.files.length - 100} more (use export to see all)</Text>
+              )}
+            </Box>
+            {outputFile && <Text color="cyan">Exported to {outputFile}</Text>}
+            <Box marginTop={1}>
+              <Text dimColor>Press Enter or Esc to exit</Text>
+            </Box>
+          </>
+        ) : (
+          <>
+            <Text color="red">Error: {result.error}</Text>
+            <Text dimColor>Press Enter or Esc to exit</Text>
+          </>
+        ))}
+    </Box>
+  );
 
-  return null;
+  return (
+    <>
+      {log.length > 0 && (
+        <Static items={log}>
+          {(line) => <Text key={line}>{line}</Text>}
+        </Static>
+      )}
+      {dynamic}
+    </>
+  );
 }
 
 function AskYesNo({ label, onAnswer }: { label: string; onAnswer: (val: boolean) => void }) {
@@ -131,11 +128,7 @@ function AskYesNo({ label, onAnswer }: { label: string; onAnswer: (val: boolean)
     else if (c === 'n' || c === '\r' || c === '\n') onAnswer(false);
   });
 
-  return (
-    <Box padding={1}>
-      <Text>{label}</Text>
-    </Box>
-  );
+  return <Text>{label}</Text>;
 }
 
 function OutputPathInput({ onSubmit }: { onSubmit: (val: string | undefined) => void }) {

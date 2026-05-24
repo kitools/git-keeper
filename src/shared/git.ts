@@ -33,13 +33,14 @@ export async function getTrackedFiles(cwd: string): Promise<string[]> {
  * @param skipIgnored - If true, only non-ignored untracked files are returned.
  *                      If false (default), ALL untracked files including ignored are returned.
  */
-export async function getUntrackedFiles(cwd: string, skipIgnored = false): Promise<string[]> {
+export async function getUntrackedFiles(cwd: string, skipIgnored = false, excludeDirs: string[] = []): Promise<string[]> {
   const args = ['ls-files', '--others'];
   if (skipIgnored) {
     args.push('--exclude-standard');
   }
-  // Default (no --exclude-standard): git ls-files --others shows ALL untracked
-  // files, including those matched by .gitignore.
+  for (const dir of excludeDirs) {
+    args.push(`:(exclude)${dir}/**`);
+  }
   const { stdout } = await execa('git', args, { cwd });
   return stdout.split('\n').filter(Boolean);
 }

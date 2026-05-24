@@ -12,6 +12,7 @@ async function collectRepoUntracked(
   repoDir: string,
   skipIgnored: boolean | undefined,
   seen: Set<string>,
+  excludeDirs: string[] = [],
 ): Promise<ScanRepoEntry[]> {
   const results: ScanRepoEntry[] = [];
 
@@ -19,7 +20,7 @@ async function collectRepoUntracked(
   seen.add(repoDir);
 
   // Main repo files
-  const files = await getUntrackedFiles(repoDir, skipIgnored);
+  const files = await getUntrackedFiles(repoDir, skipIgnored, excludeDirs);
   results.push({ repo: repoDir, files, fileCount: files.length });
 
   // Submodules
@@ -30,7 +31,7 @@ async function collectRepoUntracked(
     seen.add(subPath);
 
     if (!(await isGitRepo(subPath))) continue;
-    const subFiles = await getUntrackedFiles(subPath, skipIgnored);
+    const subFiles = await getUntrackedFiles(subPath, skipIgnored, excludeDirs);
     results.push({ repo: subPath, files: subFiles, fileCount: subFiles.length });
   }
 
@@ -59,7 +60,7 @@ export async function runScan(options: ScanOptions): Promise<ScanResult> {
   const allRepos: ScanRepoEntry[] = [];
 
   for (const repo of repoDirs) {
-    const entries = await collectRepoUntracked(repo, skipIgnored, seen);
+    const entries = await collectRepoUntracked(repo, skipIgnored, seen, config.skipDirs);
     allRepos.push(...entries);
   }
 
