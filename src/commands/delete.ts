@@ -1,5 +1,6 @@
 import {
   deleteEmptyDirs as deleteEmptyDirsRecursive,
+  deleteGitMeta,
   deleteTrackedFiles,
   getRemoteUrl,
   getTrackedFiles,
@@ -14,7 +15,7 @@ import type { DeleteOptions, DeleteResult } from '../shared/types.js';
  * keeping untracked files intact.
  */
 export async function runDelete(options: DeleteOptions): Promise<DeleteResult> {
-  const { targetDir, deleteDir } = options;
+  const { targetDir, deleteDir, deleteGit } = options;
 
   if (!(await isGitRepo(targetDir))) {
     return { success: false, error: `Not a git repository: ${targetDir}` };
@@ -45,7 +46,13 @@ export async function runDelete(options: DeleteOptions): Promise<DeleteResult> {
     emptyDirs = await deleteEmptyDirsRecursive(targetDir);
   }
 
-  return { success: true, deleted, emptyDirs, remoteFile };
+  // 6. Optionally delete git metadata (.git)
+  let gitMetaDeleted = false;
+  if (deleteGit) {
+    gitMetaDeleted = await deleteGitMeta(targetDir);
+  }
+
+  return { success: true, deleted, emptyDirs, remoteFile, gitMetaDeleted };
 }
 
 /**
@@ -63,6 +70,9 @@ export function printDeleteResult(result: DeleteResult): void {
   ];
   if (result.emptyDirs && result.emptyDirs > 0) {
     parts.push(`Removed ${result.emptyDirs} empty director(ies)`);
+  }
+  if (result.gitMetaDeleted) {
+    parts.push('Git metadata (.git) deleted');
   }
   process.stdout.write(`${parts.join('\n')}\n`);
 }

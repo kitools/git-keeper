@@ -2,6 +2,8 @@ export interface DeleteOptions {
   targetDir: string;
   /** undefined = prompt user; true/false = explicit choice */
   deleteDir?: boolean;
+  /** undefined = prompt user; true/false = explicit choice */
+  deleteGit?: boolean;
 }
 
 export interface ListOptions {
@@ -23,6 +25,7 @@ export interface DeleteResult {
   deleted?: number;
   emptyDirs?: number;
   remoteFile?: string;
+  gitMetaDeleted?: boolean;
   error?: string;
 }
 

@@ -10,9 +10,12 @@ interface DeleteUIProps {
 
 export default function DeleteUI({ options }: DeleteUIProps) {
   const [deleteDir, setDeleteDir] = useState(options.deleteDir);
+  const [deleteGit, setDeleteGit] = useState(options.deleteGit);
 
-  const [configPhase, setConfigPhase] = useState<'deleteDir' | null>(() => {
+  // Configuration flow
+  const [configPhase, setConfigPhase] = useState<'deleteDir' | 'deleteGit' | null>(() => {
     if (options.deleteDir === undefined) return 'deleteDir';
+    if (options.deleteGit === undefined) return 'deleteGit';
     return null;
   });
 
@@ -28,7 +31,7 @@ export default function DeleteUI({ options }: DeleteUIProps) {
   useEffect(() => {
     if (configPhase !== null || loading || result || error) return;
     setLoading(true);
-    runDelete({ targetDir: options.targetDir, deleteDir: deleteDir ?? false })
+    runDelete({ targetDir: options.targetDir, deleteDir: deleteDir ?? false, deleteGit: deleteGit ?? false })
       .then((res) => { setResult(res); setLoading(false); })
       .catch((err: Error) => { setError(err.message); setLoading(false); });
   }, [configPhase]);
@@ -60,6 +63,9 @@ export default function DeleteUI({ options }: DeleteUIProps) {
         {result.emptyDirs != null && result.emptyDirs > 0 && (
           <Text>Removed {result.emptyDirs} empty director(ies)</Text>
         )}
+        {result.gitMetaDeleted && (
+          <Text>Git metadata (.git) deleted — this is no longer a git repository</Text>
+        )}
         <Box marginTop={1}>
           <Text dimColor>Press Esc to exit</Text>
         </Box>
@@ -86,6 +92,20 @@ export default function DeleteUI({ options }: DeleteUIProps) {
           label="Also remove empty directories after deletion? (y/N)"
           onAnswer={(val) => {
             setDeleteDir(val);
+            setConfigPhase(options.deleteGit === undefined ? 'deleteGit' : null);
+          }}
+        />
+      </Box>
+    );
+  }
+
+  if (configPhase === 'deleteGit') {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <AskYesNo
+          label="Delete git metadata (.git directory)? This cannot be undone. (y/N)"
+          onAnswer={(val) => {
+            setDeleteGit(val);
             setConfigPhase(null);
           }}
         />

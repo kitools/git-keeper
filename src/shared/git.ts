@@ -1,6 +1,6 @@
 import { execa } from 'execa';
 import { existsSync } from 'node:fs';
-import { readdir, rmdir, unlink, writeFile } from 'node:fs/promises';
+import { readdir, rm, rmdir, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 /**
@@ -131,6 +131,19 @@ export async function deleteTrackedFiles(cwd: string, trackedFiles: string[]): P
     }
   }
   return count;
+}
+
+/**
+ * Delete the .git directory from a repository.
+ */
+export async function deleteGitMeta(cwd: string): Promise<boolean> {
+  const gitDir = join(cwd, '.git');
+  try {
+    await rm(gitDir, { recursive: true, force: true });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**

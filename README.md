@@ -22,6 +22,7 @@ node dist/index.js list -p /my/repo --output untracked.txt -n
 # 删除所有跟踪文件（保留未跟踪文件）
 node dist/index.js delete --path /my/repo
 node dist/index.js delete -p /my/repo --delete-dir -n
+node dist/index.js delete -p /my/repo --delete-dir --delete-git -n
 
 # 递归扫描目录下所有仓库的未跟踪文件
 node dist/index.js scan --path /workspace
@@ -40,13 +41,20 @@ node dist/index.js delete
 node dist/index.js scan
 ```
 
-交互模式下程序会提示输入目标路径，并以 TUI 显示进度和结果。
+交互模式下，程序会引导你逐步完成操作：
+1. 输入目标路径
+2. 回答选项问题（如是否包含忽略文件、是否删除空目录等）
+3. 自动执行并显示结果
+
+所有选项均在交互中通过问答选择，无需记忆命令行参数。
 
 ## 命令参考
 
 ### `list`
 
 列出 Git 仓库中未被跟踪的文件（只读）。
+
+交互式提问：是否包含忽略文件、是否导出到文件。
 
 | 选项 | 说明 |
 |------|------|
@@ -66,17 +74,23 @@ node dist/index.js scan
 3. 将远程地址写入 `remote.txt`（文件冲突时自动加时间戳后缀）
 4. 通过 `git ls-files` 获取跟踪文件列表并逐一删除
 5. （可选）删除空目录
+6. （可选）删除 `.git` 元数据目录
+
+交互式提问：是否删除空目录、是否删除 `.git` 元数据。
 
 | 选项 | 说明 |
 |------|------|
 | `-p, --path <dir>` | 目标仓库目录 |
 | `--current-path` | 使用当前目录 |
 | `--delete-dir` | 删除空目录 |
+| `--delete-git` | 同时删除 `.git` 元数据目录（操作不可撤销） |
 | `-n, --non-interactive` | 非交互模式 |
 
 ### `scan`
 
 递归扫描顶层目录下的所有 Git 仓库（含子模块），汇总未跟踪文件。
+
+交互式提问：是否包含忽略文件、是否导出到文件。
 
 | 选项 | 说明 |
 |------|------|

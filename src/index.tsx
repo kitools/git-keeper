@@ -10,6 +10,7 @@ export interface CliParsedArgs {
   currentPath: boolean;
   nonInteractive: boolean;
   deleteDir?: boolean;
+  deleteGit?: boolean;
   includeIgnored?: boolean;
   output?: string;
 }
@@ -31,6 +32,7 @@ OPTIONS
   --current-path           Use current working directory
   -n, --non-interactive    Run without interactive UI (for automation)
   --delete-dir             (delete only) Remove empty directories after deletion
+  --delete-git             (delete only) Also delete .git metadata directory
   --include-ignored        (list, scan) Include .gitignore-ignored files
   --output <file>          (list, scan) Write output to file
   -h, --help               Show this help
@@ -63,6 +65,7 @@ function parseArgs(): CliParsedArgs | null {
     currentPath: false,
     nonInteractive: false,
     deleteDir: undefined,
+    deleteGit: undefined,
     includeIgnored: undefined,
     output: undefined,
   };
@@ -77,6 +80,8 @@ function parseArgs(): CliParsedArgs | null {
       parsed.nonInteractive = true;
     } else if (arg === '--delete-dir') {
       parsed.deleteDir = true;
+    } else if (arg === '--delete-git') {
+      parsed.deleteGit = true;
     } else if (arg === '--include-ignored') {
       parsed.includeIgnored = true;
     } else if (arg === '--output' && i + 1 < args.length) {
@@ -117,7 +122,7 @@ async function main(): Promise<void> {
   // Non-interactive mode: run directly
   switch (parsed.command) {
     case 'delete': {
-      const result = await runDelete({ targetDir, deleteDir: parsed.deleteDir ?? false });
+      const result = await runDelete({ targetDir, deleteDir: parsed.deleteDir ?? false, deleteGit: parsed.deleteGit ?? false });
       printDeleteResult(result);
       break;
     }

@@ -46,7 +46,7 @@ export default function App({ parsed }: AppProps) {
 
   switch (parsed.command) {
     case 'delete':
-      return <DeleteUI options={{ ...common, deleteDir: parsed.deleteDir }} />;
+      return <DeleteUI options={{ ...common, deleteDir: parsed.deleteDir, deleteGit: parsed.deleteGit }} />;
     case 'list':
       return <ListUI options={{ ...common, includeIgnored: parsed.includeIgnored, output: parsed.output }} />;
     case 'scan':
