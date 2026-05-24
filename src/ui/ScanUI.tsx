@@ -104,20 +104,17 @@ export default function ScanUI({ options }: ScanUIProps) {
                       </Text>
                     ))}
                     {repo.files.length > 10 && <Text dimColor> ... and {repo.files.length - 10} more</Text>}
+                    {repo.skippedDirs.length > 0 && (
+                      <Text color="yellow">
+                        {'  '}Skipped dirs: {[...new Set(repo.skippedDirs.map((d) => d.name))].join(', ')}
+                      </Text>
+                    )}
                   </Box>
                 ))
               );
             })()}
           </Box>
           {outputFile && <Text color="cyan">Report exported to {outputFile}</Text>}
-          {result.skippedDirs.length > 0 && (
-            <Box flexDirection="column" marginTop={1}>
-              <Text color="yellow">
-                Skipped directories: {[...new Set(result.skippedDirs.map((d) => d.name))].join(', ')}
-              </Text>
-              <Text dimColor> (configured in ~/.git-keeper/git-keeper-settings.json)</Text>
-            </Box>
-          )}
           <Box marginTop={1}>
             <Text dimColor>Press Enter or Esc to exit</Text>
           </Box>

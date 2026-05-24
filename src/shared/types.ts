@@ -33,11 +33,13 @@ export interface ScanRepoEntry {
   repo: string;
   files: string[];
   fileCount: number;
+  skippedDirs: SkippedDir[];
 }
 
 export interface SkippedDir {
   path: string;
   name: string;
+  repoPath?: string;
 }
 
 export interface ScanResult {

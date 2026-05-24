@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { readdir, rm, rmdir, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { execa } from 'execa';
+import type { SkippedDir } from './types.js';
 
 /**
  * Get the remote URL for origin.
@@ -79,10 +80,10 @@ export async function findGitRepos(
   skipDirs: string[] = ['node_modules'],
 ): Promise<{
   repos: string[];
-  skippedDirs: { path: string; name: string }[];
+  skippedDirs: SkippedDir[];
 }> {
   const repos: string[] = [];
-  const skippedDirs: { path: string; name: string }[] = [];
+  const skippedDirs: SkippedDir[] = [];
 
   async function walk(dir: string, repoRoot: string | null): Promise<void> {
     let entries;
@@ -114,7 +115,13 @@ export async function findGitRepos(
             cwd: repoRoot,
             reject: false,
           });
-          if (exitCode === 0) continue; // gitignored, skip recursion
+          if (exitCode === 0) {
+            // Even if gitignored, still report if it's a configured skipDir
+            if (skipDirs.includes(entry.name)) {
+              skippedDirs.push({ path: fullPath, name: entry.name, repoPath: repoRoot ?? undefined });
+            }
+            continue; // gitignored, skip recursion
+          }
         } catch {
           // git check-ignore errors for paths outside the repo
         }
@@ -122,7 +129,7 @@ export async function findGitRepos(
 
       // Step 3: Check user-configured skip directories
       if (skipDirs.includes(entry.name)) {
-        skippedDirs.push({ path: fullPath, name: entry.name });
+        skippedDirs.push({ path: fullPath, name: entry.name, repoPath: repoRoot ?? undefined });
         continue;
       }
 

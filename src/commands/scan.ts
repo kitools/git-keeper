@@ -21,7 +21,7 @@ async function collectRepoUntracked(
 
   // Main repo files
   const files = await getUntrackedFiles(repoDir, skipIgnored, excludeDirs);
-  results.push({ repo: repoDir, files, fileCount: files.length });
+  results.push({ repo: repoDir, files, fileCount: files.length, skippedDirs: [] });
 
   // Submodules
   const submodules = await getSubmodulePaths(repoDir);
@@ -32,7 +32,7 @@ async function collectRepoUntracked(
 
     if (!(await isGitRepo(subPath))) continue;
     const subFiles = await getUntrackedFiles(subPath, skipIgnored, excludeDirs);
-    results.push({ repo: subPath, files: subFiles, fileCount: subFiles.length });
+    results.push({ repo: subPath, files: subFiles, fileCount: subFiles.length, skippedDirs: [] });
   }
 
   return results;
@@ -61,7 +61,11 @@ export async function runScan(options: ScanOptions): Promise<ScanResult> {
 
   for (const repo of repoDirs) {
     const entries = await collectRepoUntracked(repo, skipIgnored, seen, config.skipDirs);
-    allRepos.push(...entries);
+    for (const entry of entries) {
+      // Assign skipped dirs that belong to this repo
+      entry.skippedDirs = skippedDirs.filter((d) => d.repoPath === entry.repo);
+      allRepos.push(entry);
+    }
   }
 
   const totalUntracked = allRepos.reduce((sum, r) => sum + r.fileCount, 0);
@@ -74,12 +78,8 @@ export async function runScan(options: ScanOptions): Promise<ScanResult> {
       for (const file of repo.files) {
         lines.push(`  ${file}`);
       }
-    }
-    if (skippedDirs.length > 0) {
-      lines.push('');
-      lines.push('--- Skipped directories (configured) ---');
-      for (const d of skippedDirs) {
-        lines.push(`  ${d.path}`);
+      if (repo.skippedDirs.length > 0) {
+        lines.push(`  Skipped: ${[...new Set(repo.skippedDirs.map((d) => d.name))].join(', ')}`);
       }
     }
     await writeFile(options.output, lines.join('\n'), 'utf-8');
@@ -112,13 +112,10 @@ export async function printScanResult(result: ScanResult, options: ScanOptions):
     if (repo.files.length > 10) {
       process.stdout.write(`  ... and ${repo.files.length - 10} more\n`);
     }
+    if (repo.skippedDirs.length > 0) {
+      process.stdout.write(`  Skipped: ${[...new Set(repo.skippedDirs.map((d) => d.name))].join(', ')}\n`);
+    }
   }
 
   process.stdout.write(`\nTotal: ${result.totalRepos} repo(s), ${result.totalUntracked} untracked file(s)\n`);
-  if (result.skippedDirs.length > 0) {
-    const dirNames = [...new Set(result.skippedDirs.map((d) => d.name))];
-    process.stdout.write(
-      `Skipped directories: ${dirNames.join(', ')} (configured in ~/.git-keeper/git-keeper-settings.json)\n`,
-    );
-  }
 }
