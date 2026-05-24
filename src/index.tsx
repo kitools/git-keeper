@@ -62,8 +62,8 @@ function parseArgs(): CliParsedArgs | null {
     path: undefined,
     currentPath: false,
     nonInteractive: false,
-    deleteDir: false,
-    includeIgnored: false,
+    deleteDir: undefined,
+    includeIgnored: undefined,
     output: undefined,
   };
 

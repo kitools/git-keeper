@@ -7,6 +7,17 @@ import ListUI from './ListUI.js';
 import ScanUI from './ScanUI.js';
 import type { CliParsedArgs } from '../index.js';
 
+/**
+ * Normalize a user-typed path: strip surrounding quotes, resolve to absolute.
+ */
+function normalizeInputPath(input: string): string | null {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+  // Strip surrounding single or double quotes (common when copy-pasting)
+  const unquoted = trimmed.replace(/^['"](.*)['"]$/, '$1');
+  return resolve(unquoted);
+}
+
 interface AppProps {
   parsed: CliParsedArgs;
 }
@@ -25,7 +36,7 @@ export default function App({ parsed }: AppProps) {
         : 'Enter git repository path:';
     return (
       <PathInput
-        onSubmit={(dir) => setTargetDir(dir.trim() ? resolve(dir.trim()) : null)}
+        onSubmit={(dir) => setTargetDir(normalizeInputPath(dir))}
         label={label}
       />
     );
@@ -35,11 +46,11 @@ export default function App({ parsed }: AppProps) {
 
   switch (parsed.command) {
     case 'delete':
-      return <DeleteUI options={{ ...common, deleteDir: parsed.deleteDir ?? false }} />;
+      return <DeleteUI options={{ ...common, deleteDir: parsed.deleteDir }} />;
     case 'list':
-      return <ListUI options={{ ...common, includeIgnored: parsed.includeIgnored ?? false, output: parsed.output }} />;
+      return <ListUI options={{ ...common, includeIgnored: parsed.includeIgnored, output: parsed.output }} />;
     case 'scan':
-      return <ScanUI options={{ ...common, includeIgnored: parsed.includeIgnored ?? false, output: parsed.output }} />;
+      return <ScanUI options={{ ...common, includeIgnored: parsed.includeIgnored, output: parsed.output }} />;
     default:
       return (
         <Box padding={1}>

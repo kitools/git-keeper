@@ -1,17 +1,20 @@
 export interface DeleteOptions {
   targetDir: string;
-  deleteDir: boolean;
+  /** undefined = prompt user; true/false = explicit choice */
+  deleteDir?: boolean;
 }
 
 export interface ListOptions {
   targetDir: string;
-  includeIgnored: boolean;
+  /** undefined = prompt user; true/false = explicit choice */
+  includeIgnored?: boolean;
   output?: string;
 }
 
 export interface ScanOptions {
   targetDir: string;
-  includeIgnored: boolean;
+  /** undefined = prompt user; true/false = explicit choice */
+  includeIgnored?: boolean;
   output?: string;
 }
 

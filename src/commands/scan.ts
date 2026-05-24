@@ -9,7 +9,7 @@ import type { ScanOptions, ScanRepoEntry, ScanResult } from '../shared/types.js'
  */
 async function collectRepoUntracked(
   repoDir: string,
-  includeIgnored: boolean,
+  includeIgnored: boolean | undefined,
   seen: Set<string>,
 ): Promise<ScanRepoEntry[]> {
   const results: ScanRepoEntry[] = [];

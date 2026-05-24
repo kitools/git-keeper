@@ -9,20 +9,63 @@ interface DeleteUIProps {
 }
 
 export default function DeleteUI({ options }: DeleteUIProps) {
+  const [deleteDir, setDeleteDir] = useState(options.deleteDir);
+
+  const [configPhase, setConfigPhase] = useState<'deleteDir' | null>(() => {
+    if (options.deleteDir === undefined) return 'deleteDir';
+    return null;
+  });
+
   const [result, setResult] = useState<DeleteResult | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const { exit } = useApp();
 
-  useEffect(() => {
-    runDelete(options).then((res) => {
-      setResult(res);
-      setLoading(false);
-    });
-  }, [options]);
-
   useInput((_input, key) => {
-    if (key.escape || key.return) exit();
+    if (key.escape) exit();
   });
+
+  useEffect(() => {
+    if (configPhase !== null || loading || result || error) return;
+    setLoading(true);
+    runDelete({ targetDir: options.targetDir, deleteDir: deleteDir ?? false })
+      .then((res) => { setResult(res); setLoading(false); })
+      .catch((err: Error) => { setError(err.message); setLoading(false); });
+  }, [configPhase]);
+
+  if (error) {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Text color="red">Error: {error}</Text>
+        <Text dimColor>Press Esc to exit</Text>
+      </Box>
+    );
+  }
+
+  if (result) {
+    if (!result.success) {
+      return (
+        <Box flexDirection="column" padding={1}>
+          <Text color="red">Error: {result.error}</Text>
+          <Text dimColor>Press Esc to exit</Text>
+        </Box>
+      );
+    }
+
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Text color="green">Done!</Text>
+        <Text>Deleted {result.deleted} tracked file(s)</Text>
+        <Text>Remote URL saved to {result.remoteFile}</Text>
+        {result.emptyDirs != null && result.emptyDirs > 0 && (
+          <Text>Removed {result.emptyDirs} empty director(ies)</Text>
+        )}
+        <Box marginTop={1}>
+          <Text dimColor>Press Esc to exit</Text>
+        </Box>
+      </Box>
+    );
+  }
 
   if (loading) {
     return (
@@ -32,26 +75,37 @@ export default function DeleteUI({ options }: DeleteUIProps) {
     );
   }
 
-  if (!result?.success) {
+  if (configPhase === 'deleteDir') {
     return (
       <Box flexDirection="column" padding={1}>
-        <Text color="red">Error: {result?.error}</Text>
-        <Text dimColor>Press Esc or Enter to exit</Text>
+        <Text>
+          Tracked files will be deleted. Untracked files will be kept.
+          {'\n'}
+        </Text>
+        <AskYesNo
+          label="Also remove empty directories after deletion? (y/N)"
+          onAnswer={(val) => {
+            setDeleteDir(val);
+            setConfigPhase(null);
+          }}
+        />
       </Box>
     );
   }
 
+  return null;
+}
+
+function AskYesNo({ label, onAnswer }: { label: string; onAnswer: (val: boolean) => void }) {
+  useInput((ch) => {
+    const c = ch.toLowerCase();
+    if (c === 'y') onAnswer(true);
+    else if (c === 'n' || c === '\r' || c === '\n') onAnswer(false);
+  });
+
   return (
-    <Box flexDirection="column" padding={1}>
-      <Text color="green">Done!</Text>
-      <Text>Deleted {result.deleted} tracked file(s)</Text>
-      <Text>Remote URL saved to {result.remoteFile}</Text>
-      {result.emptyDirs != null && result.emptyDirs > 0 && (
-        <Text>Removed {result.emptyDirs} empty director(ies)</Text>
-      )}
-      <Box marginTop={1}>
-        <Text dimColor>Press Esc or Enter to exit</Text>
-      </Box>
+    <Box padding={1}>
+      <Text>{label}</Text>
     </Box>
   );
 }
