@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
 import { Box, Text, useApp, useInput } from 'ink';
 import TextInput from 'ink-text-input';
-import Spinner from './Spinner.js';
+import { useEffect, useState } from 'react';
 import { runList } from '../commands/list.js';
 import type { ListOptions } from '../shared/types.js';
+import Spinner from './Spinner.js';
 
 interface ListUIProps {
   options: ListOptions;
@@ -32,8 +32,14 @@ export default function ListUI({ options }: ListUIProps) {
     if (configPhase !== null || loading || result || error) return;
     setLoading(true);
     runList({ targetDir: options.targetDir, includeIgnored: includeIgnored ?? false, output: outputFile })
-      .then((res) => { setResult(res); setLoading(false); })
-      .catch((err: Error) => { setError(err.message); setLoading(false); });
+      .then((res) => {
+        setResult(res);
+        setLoading(false);
+      })
+      .catch((err: Error) => {
+        setError(err.message);
+        setLoading(false);
+      });
   }, [configPhase]);
 
   if (error) {

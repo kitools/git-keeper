@@ -1,7 +1,7 @@
-import { execa } from 'execa';
 import { existsSync } from 'node:fs';
 import { readdir, rm, rmdir, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { execa } from 'execa';
 
 /**
  * Get the remote URL for origin.
@@ -152,7 +152,7 @@ export async function deleteGitMeta(cwd: string): Promise<boolean> {
 async function getTimestampedPath(basePath: string): Promise<string> {
   if (!existsSync(basePath)) return basePath;
   const dotIndex = basePath.lastIndexOf('.');
-  if (dotIndex === -1 || basePath.includes('/') === false && dotIndex === 0) {
+  if (dotIndex === -1 || (basePath.includes('/') === false && dotIndex === 0)) {
     return `${basePath}_${Date.now()}`;
   }
   const name = basePath.slice(0, dotIndex);

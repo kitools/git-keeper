@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import { resolve } from 'node:path';
-import { runDelete, printDeleteResult } from './commands/delete.js';
-import { runList, printListResult } from './commands/list.js';
-import { runScan, printScanResult } from './commands/scan.js';
+import { printDeleteResult, runDelete } from './commands/delete.js';
+import { printListResult, runList } from './commands/list.js';
+import { printScanResult, runScan } from './commands/scan.js';
 
 export interface CliParsedArgs {
   command: 'delete' | 'list' | 'scan';
@@ -122,18 +122,38 @@ async function main(): Promise<void> {
   // Non-interactive mode: run directly
   switch (parsed.command) {
     case 'delete': {
-      const result = await runDelete({ targetDir, deleteDir: parsed.deleteDir ?? false, deleteGit: parsed.deleteGit ?? false });
+      const result = await runDelete({
+        targetDir,
+        deleteDir: parsed.deleteDir ?? false,
+        deleteGit: parsed.deleteGit ?? false,
+      });
       printDeleteResult(result);
       break;
     }
     case 'list': {
-      const result = await runList({ targetDir, includeIgnored: parsed.includeIgnored ?? false, output: parsed.output });
-      await printListResult(result, { targetDir, includeIgnored: parsed.includeIgnored ?? false, output: parsed.output });
+      const result = await runList({
+        targetDir,
+        includeIgnored: parsed.includeIgnored ?? false,
+        output: parsed.output,
+      });
+      await printListResult(result, {
+        targetDir,
+        includeIgnored: parsed.includeIgnored ?? false,
+        output: parsed.output,
+      });
       break;
     }
     case 'scan': {
-      const result = await runScan({ targetDir, includeIgnored: parsed.includeIgnored ?? false, output: parsed.output });
-      await printScanResult(result, { targetDir, includeIgnored: parsed.includeIgnored ?? false, output: parsed.output });
+      const result = await runScan({
+        targetDir,
+        includeIgnored: parsed.includeIgnored ?? false,
+        output: parsed.output,
+      });
+      await printScanResult(result, {
+        targetDir,
+        includeIgnored: parsed.includeIgnored ?? false,
+        output: parsed.output,
+      });
       break;
     }
   }

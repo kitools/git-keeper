@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import {
   deleteEmptyDirs as deleteEmptyDirsRecursive,
   deleteGitMeta,
@@ -18,6 +19,9 @@ export async function runDelete(options: DeleteOptions): Promise<DeleteResult> {
   const { targetDir, deleteDir, deleteGit } = options;
 
   if (!(await isGitRepo(targetDir))) {
+    if (!existsSync(targetDir)) {
+      return { success: false, error: `Directory does not exist: ${targetDir}` };
+    }
     return { success: false, error: `Not a git repository: ${targetDir}` };
   }
 
@@ -64,10 +68,7 @@ export function printDeleteResult(result: DeleteResult): void {
     process.exit(1);
     return;
   }
-  const parts: string[] = [
-    `Deleted ${result.deleted} tracked file(s)`,
-    `Remote URL saved to ${result.remoteFile}`,
-  ];
+  const parts: string[] = [`Deleted ${result.deleted} tracked file(s)`, `Remote URL saved to ${result.remoteFile}`];
   if (result.emptyDirs && result.emptyDirs > 0) {
     parts.push(`Removed ${result.emptyDirs} empty director(ies)`);
   }

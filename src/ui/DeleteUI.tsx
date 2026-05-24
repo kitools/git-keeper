@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
 import { Box, Text, useApp, useInput } from 'ink';
-import Spinner from './Spinner.js';
+import { useEffect, useState } from 'react';
 import { runDelete } from '../commands/delete.js';
 import type { DeleteOptions, DeleteResult } from '../shared/types.js';
+import Spinner from './Spinner.js';
 
 interface DeleteUIProps {
   options: DeleteOptions;
@@ -32,8 +32,14 @@ export default function DeleteUI({ options }: DeleteUIProps) {
     if (configPhase !== null || loading || result || error) return;
     setLoading(true);
     runDelete({ targetDir: options.targetDir, deleteDir: deleteDir ?? false, deleteGit: deleteGit ?? false })
-      .then((res) => { setResult(res); setLoading(false); })
-      .catch((err: Error) => { setError(err.message); setLoading(false); });
+      .then((res) => {
+        setResult(res);
+        setLoading(false);
+      })
+      .catch((err: Error) => {
+        setError(err.message);
+        setLoading(false);
+      });
   }, [configPhase]);
 
   if (error) {
@@ -63,9 +69,7 @@ export default function DeleteUI({ options }: DeleteUIProps) {
         {result.emptyDirs != null && result.emptyDirs > 0 && (
           <Text>Removed {result.emptyDirs} empty director(ies)</Text>
         )}
-        {result.gitMetaDeleted && (
-          <Text>Git metadata (.git) deleted — this is no longer a git repository</Text>
-        )}
+        {result.gitMetaDeleted && <Text>Git metadata (.git) deleted — this is no longer a git repository</Text>}
         <Box marginTop={1}>
           <Text dimColor>Press Esc to exit</Text>
         </Box>

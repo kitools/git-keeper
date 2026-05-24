@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import { getUntrackedFiles, isGitRepo } from '../shared/git.js';
 import type { ListOptions } from '../shared/types.js';
@@ -15,6 +16,9 @@ export async function runList(options: ListOptions): Promise<ListResult> {
   const { targetDir, includeIgnored } = options;
 
   if (!(await isGitRepo(targetDir))) {
+    if (!existsSync(targetDir)) {
+      return { success: false, files: [], error: `Directory does not exist: ${targetDir}` };
+    }
     return { success: false, files: [], error: `Not a git repository: ${targetDir}` };
   }
 

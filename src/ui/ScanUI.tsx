@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
 import { Box, Text, useApp, useInput } from 'ink';
 import TextInput from 'ink-text-input';
-import Spinner from './Spinner.js';
+import { useEffect, useState } from 'react';
 import { runScan } from '../commands/scan.js';
 import type { ScanOptions, ScanResult } from '../shared/types.js';
+import Spinner from './Spinner.js';
 
 interface ScanUIProps {
   options: ScanOptions;
@@ -39,8 +39,14 @@ export default function ScanUI({ options }: ScanUIProps) {
       includeIgnored: includeIgnored ?? false,
       output: outputFile,
     })
-      .then((res) => { setResult(res); setLoading(false); })
-      .catch((err: Error) => { setError(err.message); setLoading(false); });
+      .then((res) => {
+        setResult(res);
+        setLoading(false);
+      })
+      .catch((err: Error) => {
+        setError(err.message);
+        setLoading(false);
+      });
   }, [configPhase]);
 
   // ----- Render states -----
@@ -78,9 +84,7 @@ export default function ScanUI({ options }: ScanUIProps) {
                     {file}
                   </Text>
                 ))}
-                {repo.files.length > 10 && (
-                  <Text dimColor>  ... and {repo.files.length - 10} more</Text>
-                )}
+                {repo.files.length > 10 && <Text dimColor> ... and {repo.files.length - 10} more</Text>}
               </Box>
             ))
           )}

@@ -44,7 +44,7 @@ export async function runScan(options: ScanOptions): Promise<ScanResult> {
   const { targetDir, includeIgnored } = options;
 
   if (!existsSync(targetDir)) {
-    return { repos: [], totalRepos: 0, totalUntracked: 0 };
+    throw new Error(`Directory does not exist: ${targetDir}`);
   }
 
   // Find all top-level git repos

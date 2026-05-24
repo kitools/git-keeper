@@ -1,6 +1,6 @@
-import { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
+import { useState } from 'react';
 
 interface PathInputProps {
   onSubmit: (dir: string) => void;
