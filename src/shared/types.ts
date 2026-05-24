@@ -9,14 +9,14 @@ export interface DeleteOptions {
 export interface ListOptions {
   targetDir: string;
   /** undefined = prompt user; true/false = explicit choice */
-  includeIgnored?: boolean;
+  skipIgnored?: boolean;
   output?: string;
 }
 
 export interface ScanOptions {
   targetDir: string;
   /** undefined = prompt user; true/false = explicit choice */
-  includeIgnored?: boolean;
+  skipIgnored?: boolean;
   output?: string;
 }
 
@@ -35,8 +35,14 @@ export interface ScanRepoEntry {
   fileCount: number;
 }
 
+export interface SkippedDir {
+  path: string;
+  name: string;
+}
+
 export interface ScanResult {
   repos: ScanRepoEntry[];
   totalRepos: number;
   totalUntracked: number;
+  skippedDirs: SkippedDir[];
 }

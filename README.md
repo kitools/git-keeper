@@ -14,10 +14,10 @@ pnpm build
 ### 非交互模式（适合 Agent/自动化）
 
 ```bash
-# 列出未跟踪文件
+# 列出未跟踪文件（默认显示全部，--skip-ignored 过滤 gitignore 忽略的）
 node dist/index.js list --path /my/repo
-node dist/index.js list --current-path --include-ignored
-node dist/index.js list -p /my/repo --output untracked.txt -n
+node dist/index.js list -p /my/repo --skip-ignored
+node dist/index.js list -p /my/repo --skip-ignored --output untracked.txt -n
 
 # 删除所有跟踪文件（保留未跟踪文件）
 node dist/index.js delete --path /my/repo
@@ -26,7 +26,7 @@ node dist/index.js delete -p /my/repo --delete-dir --delete-git -n
 
 # 递归扫描目录下所有仓库的未跟踪文件
 node dist/index.js scan --path /workspace
-node dist/index.js scan -p /workspace --include-ignored --output report.txt -n
+node dist/index.js scan -p /workspace --skip-ignored --output report.txt -n
 ```
 
 ### 交互模式
@@ -43,7 +43,7 @@ node dist/index.js scan
 
 交互模式下，程序会引导你逐步完成操作：
 1. 输入目标路径
-2. 回答选项问题（如是否包含忽略文件、是否删除空目录等）
+2. 回答选项问题（如是否跳过 gitignore 忽略的文件、是否删除空目录等）
 3. 自动执行并显示结果
 
 所有选项均在交互中通过问答选择，无需记忆命令行参数。
@@ -54,13 +54,15 @@ node dist/index.js scan
 
 列出 Git 仓库中未被跟踪的文件（只读）。
 
-交互式提问：是否包含忽略文件、是否导出到文件。
+交互式提问：是否跳过 gitignore 忽略的文件、是否导出到文件。
+
+默认显示所有未跟踪文件（含被 gitignore 忽略的），使用 `--skip-ignored` 过滤。
 
 | 选项 | 说明 |
 |------|------|
 | `-p, --path <dir>` | 目标仓库目录 |
 | `--current-path` | 使用当前目录 |
-| `--include-ignored` | 同时列出被 `.gitignore` 忽略的文件 |
+| `--skip-ignored` | 过滤掉被 `.gitignore` 忽略的文件 |
 | `--output <file>` | 将文件列表导出到文件 |
 | `-n, --non-interactive` | 非交互模式 |
 
@@ -90,13 +92,15 @@ node dist/index.js scan
 
 递归扫描顶层目录下的所有 Git 仓库（含子模块），汇总未跟踪文件。
 
-交互式提问：是否包含忽略文件、是否导出到文件。
+交互式提问：是否跳过 gitignore 忽略的文件、是否导出到文件。
+
+默认显示所有未跟踪文件（含被 gitignore 忽略的），使用 `--skip-ignored` 过滤。
 
 | 选项 | 说明 |
 |------|------|
 | `-p, --path <dir>` | 顶层扫描目录 |
 | `--current-path` | 使用当前目录 |
-| `--include-ignored` | 同时列出被忽略的文件 |
+| `--skip-ignored` | 过滤掉被 `.gitignore` 忽略的文件 |
 | `--output <file>` | 导出完整报告 |
 | `-n, --non-interactive` | 非交互模式 |
 

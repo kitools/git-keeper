@@ -10,13 +10,13 @@ interface ScanUIProps {
 }
 
 export default function ScanUI({ options }: ScanUIProps) {
-  const [includeIgnored, setIncludeIgnored] = useState(options.includeIgnored);
+  const [skipIgnored, setSkipIgnored] = useState(options.skipIgnored);
   const [outputFile, setOutputFile] = useState<string | undefined>(options.output);
 
   // Configuration flow: which prompt are we on?
   // 'ignored' -> 'output' -> null means done configuring
   const [configPhase, setConfigPhase] = useState<'ignored' | 'output' | null>(() => {
-    if (options.includeIgnored === undefined) return 'ignored';
+    if (options.skipIgnored === undefined) return 'ignored';
     if (options.output === undefined) return 'output';
     return null;
   });
@@ -36,7 +36,7 @@ export default function ScanUI({ options }: ScanUIProps) {
     setLoading(true);
     runScan({
       targetDir: options.targetDir,
-      includeIgnored: includeIgnored ?? false,
+      skipIgnored: skipIgnored ?? false,
       output: outputFile,
     })
       .then((res) => {
@@ -90,6 +90,14 @@ export default function ScanUI({ options }: ScanUIProps) {
           )}
         </Box>
         {outputFile && <Text color="cyan">Report exported to {outputFile}</Text>}
+        {result.skippedDirs.length > 0 && (
+          <Box flexDirection="column" marginTop={1}>
+            <Text color="yellow">
+              Skipped directories: {[...new Set(result.skippedDirs.map((d) => d.name))].join(', ')}
+            </Text>
+            <Text dimColor> (configured in ~/.git-keeper/git-keeper-settings.json)</Text>
+          </Box>
+        )}
         <Box marginTop={1}>
           <Text dimColor>Press Esc to exit</Text>
         </Box>
@@ -110,9 +118,9 @@ export default function ScanUI({ options }: ScanUIProps) {
   if (configPhase === 'ignored') {
     return (
       <AskYesNo
-        label="Include git-ignored files? (y/N)"
+        label="Skip git-ignored files? (y/N)"
         onAnswer={(val) => {
-          setIncludeIgnored(val);
+          setSkipIgnored(val);
           setConfigPhase(options.output === undefined ? 'output' : null);
         }}
       />

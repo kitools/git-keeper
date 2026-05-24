@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { loadGlobalConfig } from '../shared/config.js';
 import { findGitRepos, getSubmodulePaths, getUntrackedFiles, isGitRepo } from '../shared/git.js';
 import type { ScanOptions, ScanRepoEntry, ScanResult } from '../shared/types.js';
 
@@ -9,7 +10,7 @@ import type { ScanOptions, ScanRepoEntry, ScanResult } from '../shared/types.js'
  */
 async function collectRepoUntracked(
   repoDir: string,
-  includeIgnored: boolean | undefined,
+  skipIgnored: boolean | undefined,
   seen: Set<string>,
 ): Promise<ScanRepoEntry[]> {
   const results: ScanRepoEntry[] = [];
@@ -18,7 +19,7 @@ async function collectRepoUntracked(
   seen.add(repoDir);
 
   // Main repo files
-  const files = await getUntrackedFiles(repoDir, includeIgnored);
+  const files = await getUntrackedFiles(repoDir, skipIgnored);
   results.push({ repo: repoDir, files, fileCount: files.length });
 
   // Submodules
@@ -29,7 +30,7 @@ async function collectRepoUntracked(
     seen.add(subPath);
 
     if (!(await isGitRepo(subPath))) continue;
-    const subFiles = await getUntrackedFiles(subPath, includeIgnored);
+    const subFiles = await getUntrackedFiles(subPath, skipIgnored);
     results.push({ repo: subPath, files: subFiles, fileCount: subFiles.length });
   }
 
@@ -41,21 +42,24 @@ async function collectRepoUntracked(
  * and list untracked files in each, including submodules.
  */
 export async function runScan(options: ScanOptions): Promise<ScanResult> {
-  const { targetDir, includeIgnored } = options;
+  const { targetDir, skipIgnored } = options;
 
   if (!existsSync(targetDir)) {
     throw new Error(`Directory does not exist: ${targetDir}`);
   }
 
+  // Load global config for skip dirs
+  const config = loadGlobalConfig();
+
   // Find all top-level git repos
-  const repoDirs = await findGitRepos(targetDir);
+  const { repos: repoDirs, skippedDirs } = await findGitRepos(targetDir, config.skipDirs);
 
   // Collect untracked files for each, with submodule expansion
   const seen = new Set<string>();
   const allRepos: ScanRepoEntry[] = [];
 
   for (const repo of repoDirs) {
-    const entries = await collectRepoUntracked(repo, includeIgnored, seen);
+    const entries = await collectRepoUntracked(repo, skipIgnored, seen);
     allRepos.push(...entries);
   }
 
@@ -70,10 +74,17 @@ export async function runScan(options: ScanOptions): Promise<ScanResult> {
         lines.push(`  ${file}`);
       }
     }
+    if (skippedDirs.length > 0) {
+      lines.push('');
+      lines.push('--- Skipped directories (configured) ---');
+      for (const d of skippedDirs) {
+        lines.push(`  ${d.path}`);
+      }
+    }
     await writeFile(options.output, lines.join('\n'), 'utf-8');
   }
 
-  return { repos: allRepos, totalRepos: allRepos.length, totalUntracked };
+  return { repos: allRepos, totalRepos: allRepos.length, totalUntracked, skippedDirs };
 }
 
 /**
@@ -103,4 +114,10 @@ export async function printScanResult(result: ScanResult, options: ScanOptions):
   }
 
   process.stdout.write(`\nTotal: ${result.totalRepos} repo(s), ${result.totalUntracked} untracked file(s)\n`);
+  if (result.skippedDirs.length > 0) {
+    const dirNames = [...new Set(result.skippedDirs.map((d) => d.name))];
+    process.stdout.write(
+      `Skipped directories: ${dirNames.join(', ')} (configured in ~/.git-keeper/git-keeper-settings.json)\n`,
+    );
+  }
 }

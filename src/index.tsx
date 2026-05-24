@@ -11,7 +11,7 @@ export interface CliParsedArgs {
   nonInteractive: boolean;
   deleteDir?: boolean;
   deleteGit?: boolean;
-  includeIgnored?: boolean;
+  skipIgnored?: boolean;
   output?: string;
 }
 
@@ -33,13 +33,13 @@ OPTIONS
   -n, --non-interactive    Run without interactive UI (for automation)
   --delete-dir             (delete only) Remove empty directories after deletion
   --delete-git             (delete only) Also delete .git metadata directory
-  --include-ignored        (list, scan) Include .gitignore-ignored files
+  --skip-ignored           (list, scan) Exclude .gitignore-ignored files from output
   --output <file>          (list, scan) Write output to file
   -h, --help               Show this help
 
 EXAMPLES
   git-keeper delete -p /my/repo --delete-dir
-  git-keeper list --current-path --include-ignored
+  git-keeper list --current-path --skip-ignored
   git-keeper scan -p /workspace -n --output report.txt
 `);
 }
@@ -66,7 +66,7 @@ function parseArgs(): CliParsedArgs | null {
     nonInteractive: false,
     deleteDir: undefined,
     deleteGit: undefined,
-    includeIgnored: undefined,
+    skipIgnored: undefined,
     output: undefined,
   };
 
@@ -82,8 +82,8 @@ function parseArgs(): CliParsedArgs | null {
       parsed.deleteDir = true;
     } else if (arg === '--delete-git') {
       parsed.deleteGit = true;
-    } else if (arg === '--include-ignored') {
-      parsed.includeIgnored = true;
+    } else if (arg === '--skip-ignored') {
+      parsed.skipIgnored = true;
     } else if (arg === '--output' && i + 1 < args.length) {
       parsed.output = resolve(args[++i]);
     } else {
@@ -133,12 +133,12 @@ async function main(): Promise<void> {
     case 'list': {
       const result = await runList({
         targetDir,
-        includeIgnored: parsed.includeIgnored ?? false,
+        skipIgnored: parsed.skipIgnored ?? false,
         output: parsed.output,
       });
       await printListResult(result, {
         targetDir,
-        includeIgnored: parsed.includeIgnored ?? false,
+        skipIgnored: parsed.skipIgnored ?? false,
         output: parsed.output,
       });
       break;
@@ -146,12 +146,12 @@ async function main(): Promise<void> {
     case 'scan': {
       const result = await runScan({
         targetDir,
-        includeIgnored: parsed.includeIgnored ?? false,
+        skipIgnored: parsed.skipIgnored ?? false,
         output: parsed.output,
       });
       await printScanResult(result, {
         targetDir,
-        includeIgnored: parsed.includeIgnored ?? false,
+        skipIgnored: parsed.skipIgnored ?? false,
         output: parsed.output,
       });
       break;

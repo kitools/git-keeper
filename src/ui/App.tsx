@@ -69,9 +69,9 @@ export default function App({ parsed }: AppProps) {
     case 'delete':
       return <DeleteUI options={{ ...common, deleteDir: parsed.deleteDir, deleteGit: parsed.deleteGit }} />;
     case 'list':
-      return <ListUI options={{ ...common, includeIgnored: parsed.includeIgnored, output: parsed.output }} />;
+      return <ListUI options={{ ...common, skipIgnored: parsed.skipIgnored, output: parsed.output }} />;
     case 'scan':
-      return <ScanUI options={{ ...common, includeIgnored: parsed.includeIgnored, output: parsed.output }} />;
+      return <ScanUI options={{ ...common, skipIgnored: parsed.skipIgnored, output: parsed.output }} />;
     default:
       return (
         <Box padding={1}>

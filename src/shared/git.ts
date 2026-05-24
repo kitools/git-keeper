@@ -30,12 +30,16 @@ export async function getTrackedFiles(cwd: string): Promise<string[]> {
 
 /**
  * Get untracked files via git ls-files --others.
+ * @param skipIgnored - If true, only non-ignored untracked files are returned.
+ *                      If false (default), ALL untracked files including ignored are returned.
  */
-export async function getUntrackedFiles(cwd: string, includeIgnored = false): Promise<string[]> {
-  const args = ['ls-files', '--others', '--exclude-standard'];
-  if (includeIgnored) {
-    args.push('--ignored');
+export async function getUntrackedFiles(cwd: string, skipIgnored = false): Promise<string[]> {
+  const args = ['ls-files', '--others'];
+  if (skipIgnored) {
+    args.push('--exclude-standard');
   }
+  // Default (no --exclude-standard): git ls-files --others shows ALL untracked
+  // files, including those matched by .gitignore.
   const { stdout } = await execa('git', args, { cwd });
   return stdout.split('\n').filter(Boolean);
 }
@@ -69,32 +73,65 @@ export async function writeRemoteFile(cwd: string): Promise<string> {
   return finalPath;
 }
 
-/**
- * Recursively find all Git repos under a root directory.
- * Skips hidden directories (starting with .) except the root itself.
- */
-export async function findGitRepos(root: string): Promise<string[]> {
+export async function findGitRepos(
+  root: string,
+  skipDirs: string[] = ['node_modules'],
+): Promise<{
+  repos: string[];
+  skippedDirs: { path: string; name: string }[];
+}> {
   const repos: string[] = [];
-  async function walk(dir: string) {
+  const skippedDirs: { path: string; name: string }[] = [];
+
+  async function walk(dir: string, repoRoot: string | null): Promise<void> {
     let entries;
     try {
       entries = await readdir(dir, { withFileTypes: true });
     } catch {
       return;
     }
-    const hasGit = entries.some((e) => e.isDirectory() && e.name === '.git');
-    if (hasGit) {
+
+    // Step 1: Check if this directory is itself a git repo
+    const isRepo = entries.some((e) => e.isDirectory() && e.name === '.git');
+    if (isRepo) {
       repos.push(dir);
-      return;
+      // Subdirectories should respect this repo's .gitignore
+      repoRoot = dir;
     }
+
     for (const entry of entries) {
-      if (entry.isDirectory() && !entry.name.startsWith('.') && entry.name !== 'node_modules') {
-        await walk(join(dir, entry.name));
+      if (!entry.isDirectory()) continue;
+      if (entry.name === '.git') continue;
+      if (entry.name.startsWith('.')) continue;
+
+      const fullPath = join(dir, entry.name);
+
+      // Step 2: Check .gitignore (only when inside a known git repo)
+      if (repoRoot) {
+        try {
+          const { exitCode } = await execa('git', ['check-ignore', fullPath], {
+            cwd: repoRoot,
+            reject: false,
+          });
+          if (exitCode === 0) continue; // gitignored, skip recursion
+        } catch {
+          // git check-ignore errors for paths outside the repo
+        }
       }
+
+      // Step 3: Check user-configured skip directories
+      if (skipDirs.includes(entry.name)) {
+        skippedDirs.push({ path: fullPath, name: entry.name });
+        continue;
+      }
+
+      // Step 4: Recurse
+      await walk(fullPath, repoRoot);
     }
   }
-  await walk(root);
-  return repos;
+
+  await walk(root, null);
+  return { repos, skippedDirs };
 }
 
 /**

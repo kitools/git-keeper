@@ -13,7 +13,7 @@ export interface ListResult {
  * Execute the list command: list all untracked files in a git repo.
  */
 export async function runList(options: ListOptions): Promise<ListResult> {
-  const { targetDir, includeIgnored } = options;
+  const { targetDir, skipIgnored } = options;
 
   if (!(await isGitRepo(targetDir))) {
     if (!existsSync(targetDir)) {
@@ -22,7 +22,7 @@ export async function runList(options: ListOptions): Promise<ListResult> {
     return { success: false, files: [], error: `Not a git repository: ${targetDir}` };
   }
 
-  const files = await getUntrackedFiles(targetDir, includeIgnored);
+  const files = await getUntrackedFiles(targetDir, skipIgnored);
 
   if (options.output) {
     await writeFile(options.output, files.join('\n'), 'utf-8');

@@ -10,11 +10,11 @@ interface ListUIProps {
 }
 
 export default function ListUI({ options }: ListUIProps) {
-  const [includeIgnored, setIncludeIgnored] = useState(options.includeIgnored);
+  const [skipIgnored, setSkipIgnored] = useState(options.skipIgnored);
   const [outputFile, setOutputFile] = useState<string | undefined>(options.output);
 
   const [configPhase, setConfigPhase] = useState<'ignored' | 'output' | null>(() => {
-    if (options.includeIgnored === undefined) return 'ignored';
+    if (options.skipIgnored === undefined) return 'ignored';
     if (options.output === undefined) return 'output';
     return null;
   });
@@ -31,7 +31,7 @@ export default function ListUI({ options }: ListUIProps) {
   useEffect(() => {
     if (configPhase !== null || loading || result || error) return;
     setLoading(true);
-    runList({ targetDir: options.targetDir, includeIgnored: includeIgnored ?? false, output: outputFile })
+    runList({ targetDir: options.targetDir, skipIgnored: skipIgnored ?? false, output: outputFile })
       .then((res) => {
         setResult(res);
         setLoading(false);
@@ -69,7 +69,7 @@ export default function ListUI({ options }: ListUIProps) {
       <Box flexDirection="column" padding={1}>
         <Text bold>
           Found {files.length} untracked file{files.length !== 1 ? 's' : ''}
-          {includeIgnored ? ' (including ignored)' : ''}
+          {skipIgnored ? ' (excluding git-ignored)' : ''}
         </Text>
         <Box flexDirection="column" marginTop={1}>
           {displayFiles.map((file, i) => (
@@ -98,9 +98,9 @@ export default function ListUI({ options }: ListUIProps) {
   if (configPhase === 'ignored') {
     return (
       <AskYesNo
-        label="Include git-ignored files? (y/N)"
+        label="Skip git-ignored files? (y/N)"
         onAnswer={(val) => {
-          setIncludeIgnored(val);
+          setSkipIgnored(val);
           setConfigPhase(options.output === undefined ? 'output' : null);
         }}
       />
