@@ -18,6 +18,8 @@ export interface ScanOptions {
   /** undefined = prompt user; true/false = explicit choice */
   skipIgnored?: boolean;
   output?: string;
+  willingDepth?: number;
+  willingBreadth?: number;
 }
 
 export interface DeleteResult {
@@ -42,9 +44,15 @@ export interface SkippedDir {
   repoPath?: string;
 }
 
+export interface NonRepoDir {
+  path: string;
+  reason: 'depth' | 'breadth' | 'no-repo';
+}
+
 export interface ScanResult {
   repos: ScanRepoEntry[];
   totalRepos: number;
   totalUntracked: number;
   skippedDirs: SkippedDir[];
+  nonRepoDirs: NonRepoDir[];
 }

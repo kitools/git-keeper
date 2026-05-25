@@ -123,6 +123,30 @@ export default function ScanUI({ options }: ScanUIProps) {
               <Text dimColor> (configured in ~/.git-keeper/git-keeper-settings.json)</Text>
             </Box>
           )}
+          {result.nonRepoDirs.length > 0 && (
+            <>
+              {result.nonRepoDirs.filter((d) => d.reason !== 'no-repo').length > 0 && (
+                <Box flexDirection="column" marginTop={1}>
+                  <Text color="yellow">Non-repo directories (hit limits):</Text>
+                  {result.nonRepoDirs.filter((d) => d.reason !== 'no-repo').map((d) => (
+                    <Text key={d.path} dimColor>
+                      {'  '}{d.path} (limit: {d.reason})
+                    </Text>
+                  ))}
+                </Box>
+              )}
+              {result.nonRepoDirs.filter((d) => d.reason === 'no-repo').length > 0 && (
+                <Box flexDirection="column" marginTop={1}>
+                  <Text color="yellow">Non-repo directories:</Text>
+                  {result.nonRepoDirs.filter((d) => d.reason === 'no-repo').map((d) => (
+                    <Text key={d.path} dimColor>
+                      {'  '}{d.path}
+                    </Text>
+                  ))}
+                </Box>
+              )}
+            </>
+          )}
           <Box marginTop={1}>
             <Text dimColor>Press Enter or Esc to exit</Text>
           </Box>

@@ -71,7 +71,17 @@ export default function App({ parsed }: AppProps) {
     case 'list':
       return <ListUI options={{ ...common, skipIgnored: parsed.skipIgnored, output: parsed.output }} />;
     case 'scan':
-      return <ScanUI options={{ ...common, skipIgnored: parsed.skipIgnored, output: parsed.output }} />;
+      return (
+        <ScanUI
+          options={{
+            ...common,
+            skipIgnored: parsed.skipIgnored,
+            output: parsed.output,
+            willingDepth: parsed.willingDepth,
+            willingBreadth: parsed.willingBreadth,
+          }}
+        />
+      );
     default:
       return (
         <Box padding={1}>

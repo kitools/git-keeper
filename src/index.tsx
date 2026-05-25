@@ -13,6 +13,8 @@ export interface CliParsedArgs {
   deleteGit?: boolean;
   skipIgnored?: boolean;
   output?: string;
+  willingDepth?: number;
+  willingBreadth?: number;
 }
 
 function showHelp(): void {
@@ -35,6 +37,8 @@ OPTIONS
   --delete-git             (delete only) Also delete .git metadata directory
   --skip-ignored           (list, scan) Exclude .gitignore-ignored files from output
   --output <file>          (list, scan) Write output to file
+  --willing-depth <n>      (scan) Max depth to search for repos from non-repo dirs (default 3)
+  --willing-breadth <n>    (scan) Max sibling subdirs to check from a non-repo dir (default 500)
   -h, --help               Show this help
 
 EXAMPLES
@@ -86,6 +90,10 @@ function parseArgs(): CliParsedArgs | null {
       parsed.skipIgnored = true;
     } else if (arg === '--output' && i + 1 < args.length) {
       parsed.output = resolve(args[++i]);
+    } else if (arg === '--willing-depth' && i + 1 < args.length) {
+      parsed.willingDepth = Number(args[++i]);
+    } else if (arg === '--willing-breadth' && i + 1 < args.length) {
+      parsed.willingBreadth = Number(args[++i]);
     } else {
       process.stderr.write(`Unknown option: ${arg}\n`);
       process.exit(1);
@@ -148,6 +156,8 @@ async function main(): Promise<void> {
         targetDir,
         skipIgnored: parsed.skipIgnored ?? false,
         output: parsed.output,
+        willingDepth: parsed.willingDepth,
+        willingBreadth: parsed.willingBreadth,
       });
       await printScanResult(result, {
         targetDir,

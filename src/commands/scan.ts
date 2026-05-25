@@ -53,7 +53,12 @@ export async function runScan(options: ScanOptions): Promise<ScanResult> {
   const config = loadGlobalConfig();
 
   // Find all top-level git repos
-  const { repos: repoDirs, skippedDirs } = await findGitRepos(targetDir, config.skipDirs);
+  const { repos: repoDirs, skippedDirs, nonRepoDirs } = await findGitRepos(
+    targetDir,
+    config.skipDirs,
+    options.willingDepth ?? 3,
+    options.willingBreadth ?? 500,
+  );
 
   // Collect untracked files for each, with submodule expansion
   const seen = new Set<string>();
@@ -87,10 +92,26 @@ export async function runScan(options: ScanOptions): Promise<ScanResult> {
         lines.push(`  Skipped: ${[...new Set(repo.skippedDirs.map((d) => d.name))].join(', ')}`);
       }
     }
+    if (nonRepoDirs.length > 0) {
+      const hitLimits = nonRepoDirs.filter((d) => d.reason !== 'no-repo');
+      const noRepo = nonRepoDirs.filter((d) => d.reason === 'no-repo');
+      if (hitLimits.length > 0) {
+        lines.push(`\nNon-repo directories (hit limits):`);
+        for (const d of hitLimits) {
+          lines.push(`  ${d.path} (limit: ${d.reason})`);
+        }
+      }
+      if (noRepo.length > 0) {
+        lines.push(`\nNon-repo directories:`);
+        for (const d of noRepo) {
+          lines.push(`  ${d.path}`);
+        }
+      }
+    }
     await writeFile(options.output, lines.join('\n'), 'utf-8');
   }
 
-  return { repos: allRepos, totalRepos: allRepos.length, totalUntracked, skippedDirs };
+  return { repos: allRepos, totalRepos: allRepos.length, totalUntracked, skippedDirs, nonRepoDirs };
 }
 
 /**
@@ -106,21 +127,36 @@ export async function printScanResult(result: ScanResult, options: ScanOptions):
 
   if (result.repos.length === 0) {
     process.stdout.write(`No git repositories found in: ${options.targetDir}\n`);
-    return;
-  }
+  } else {
+    for (const repo of result.repos) {
+      process.stdout.write(`[${repo.repo}] ${repo.fileCount} untracked\n`);
+      for (const file of repo.files.slice(0, 10)) {
+        process.stdout.write(`  ${file}\n`);
+      }
+      if (repo.files.length > 10) {
+        process.stdout.write(`  ... and ${repo.files.length - 10} more\n`);
+      }
+      if (repo.skippedDirs.length > 0) {
+        process.stdout.write(`  Skipped: ${[...new Set(repo.skippedDirs.map((d) => d.name))].join(', ')}\n`);
+      }
+    }
 
-  for (const repo of result.repos) {
-    process.stdout.write(`[${repo.repo}] ${repo.fileCount} untracked\n`);
-    for (const file of repo.files.slice(0, 10)) {
-      process.stdout.write(`  ${file}\n`);
+    process.stdout.write(`\nTotal: ${result.totalRepos} repo(s), ${result.totalUntracked} untracked file(s)\n`);
+  }
+  if (result.nonRepoDirs.length > 0) {
+    const hitLimits = result.nonRepoDirs.filter((d) => d.reason !== 'no-repo');
+    const noRepo = result.nonRepoDirs.filter((d) => d.reason === 'no-repo');
+    if (hitLimits.length > 0) {
+      process.stdout.write(`\nNon-repo directories (hit limits):\n`);
+      for (const d of hitLimits) {
+        process.stdout.write(`  ${d.path} (limit: ${d.reason})\n`);
+      }
     }
-    if (repo.files.length > 10) {
-      process.stdout.write(`  ... and ${repo.files.length - 10} more\n`);
-    }
-    if (repo.skippedDirs.length > 0) {
-      process.stdout.write(`  Skipped: ${[...new Set(repo.skippedDirs.map((d) => d.name))].join(', ')}\n`);
+    if (noRepo.length > 0) {
+      process.stdout.write(`\nNon-repo directories:\n`);
+      for (const d of noRepo) {
+        process.stdout.write(`  ${d.path}\n`);
+      }
     }
   }
-
-  process.stdout.write(`\nTotal: ${result.totalRepos} repo(s), ${result.totalUntracked} untracked file(s)\n`);
 }

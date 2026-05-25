@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { readdir, rm, rmdir, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { execa } from 'execa';
-import type { SkippedDir } from './types.js';
+import type { NonRepoDir, SkippedDir } from './types.js';
 
 /**
  * Get the remote URL for origin.
@@ -78,34 +78,79 @@ export async function writeRemoteFile(cwd: string): Promise<string> {
 export async function findGitRepos(
   root: string,
   skipDirs: string[] = ['node_modules'],
+  willingDepth = 3,
+  willingBreadth = 500,
 ): Promise<{
   repos: string[];
   skippedDirs: SkippedDir[];
+  nonRepoDirs: NonRepoDir[];
 }> {
   const repos: string[] = [];
   const skippedDirs: SkippedDir[] = [];
+  const nonRepoDirs: NonRepoDir[] = [];
 
-  async function walk(dir: string, repoRoot: string | null): Promise<void> {
+  const reportedNonRepoPaths = new Set<string>();
+
+  function addNonRepoDir(path: string, reason: NonRepoDir['reason']): void {
+    if (!reportedNonRepoPaths.has(path)) {
+      reportedNonRepoPaths.add(path);
+      nonRepoDirs.push({ path, reason });
+    }
+  }
+
+  async function walk(
+    dir: string,
+    repoRoot: string | null,
+    depth: number,
+    chainStart: string | null,
+  ): Promise<boolean> {
+    // Returns true if a repo was found in this directory (or its subtree)
     let entries;
     try {
       entries = await readdir(dir, { withFileTypes: true });
     } catch {
-      return;
+      return false;
     }
 
     // Step 1: Check if this directory is itself a git repo
     const isRepo = entries.some((e) => e.isDirectory() && e.name === '.git');
     if (isRepo) {
       repos.push(dir);
-      // Subdirectories should respect this repo's .gitignore
       repoRoot = dir;
+      depth = 0;
+      chainStart = null;
     }
 
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-      if (entry.name === '.git') continue;
-      if (entry.name.startsWith('.')) continue;
+    // Step 1b: Depth limit — only for non-repo dirs outside any repo
+    if (!isRepo && repoRoot === null && depth > willingDepth) {
+      addNonRepoDir(chainStart ?? dir, 'depth');
+      return false;
+    }
 
+    // Filter subdirectories
+    const subdirs: import('node:fs').Dirent[] = [];
+    for (const e of entries) {
+      if (!e.isDirectory()) continue;
+      if (e.name === '.git') continue;
+      if (e.name.startsWith('.')) continue;
+      subdirs.push(e);
+    }
+
+    // Breadth check: outside any repo, count non-skipDirs subdirectories
+    if (subdirs.length > 0 && repoRoot === null) {
+      let candidateCount = 0;
+      for (const e of subdirs) {
+        if (!skipDirs.includes(e.name)) candidateCount++;
+      }
+      if (candidateCount > willingBreadth) {
+        addNonRepoDir(chainStart ?? dir, 'breadth');
+        return false;
+      }
+    }
+
+    let foundRepo = isRepo;
+
+    for (const entry of subdirs) {
       const fullPath = join(dir, entry.name);
 
       // Step 2: Check .gitignore (only when inside a known git repo)
@@ -116,11 +161,10 @@ export async function findGitRepos(
             reject: false,
           });
           if (exitCode === 0) {
-            // Even if gitignored, still report if it's a configured skipDir
             if (skipDirs.includes(entry.name)) {
-              skippedDirs.push({ path: fullPath, name: entry.name, repoPath: repoRoot ?? undefined });
+              skippedDirs.push({ path: fullPath, name: entry.name, repoPath: repoRoot });
             }
-            continue; // gitignored, skip recursion
+            continue;
           }
         } catch {
           // git check-ignore errors for paths outside the repo
@@ -133,13 +177,31 @@ export async function findGitRepos(
         continue;
       }
 
-      // Step 4: Recurse
-      await walk(fullPath, repoRoot);
+      // Step 4: Calculate tracking for recursion
+      let nextDepth = depth;
+      let nextChainStart = chainStart;
+      if (repoRoot === null) {
+        nextDepth = depth + 1;
+        if (nextChainStart === null) {
+          nextChainStart = fullPath;
+        }
+      }
+
+      // Step 5: Recurse
+      const subFound = await walk(fullPath, repoRoot, nextDepth, nextChainStart);
+      if (subFound) foundRepo = true;
     }
+
+    // Step 6: Report non-repo chain (topmost only) if no repos found in subtree
+    if (!isRepo && repoRoot === null && chainStart === dir && !foundRepo && depth > 0) {
+      addNonRepoDir(dir, 'no-repo');
+    }
+
+    return foundRepo;
   }
 
-  await walk(root, null);
-  return { repos, skippedDirs };
+  await walk(root, null, 0, null);
+  return { repos, skippedDirs, nonRepoDirs };
 }
 
 /**
