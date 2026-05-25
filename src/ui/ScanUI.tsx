@@ -1,3 +1,5 @@
+import { homedir } from 'node:os';
+import { basename, join } from 'node:path';
 import { Box, Static, Text, useApp, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import { useEffect, useState } from 'react';
@@ -9,13 +11,26 @@ interface ScanUIProps {
   options: ScanOptions;
 }
 
+function getDefaultSaveDir(): string {
+  return join(homedir(), 'Downloads');
+}
+
+function getDefaultSaveName(targetDir: string): string {
+  const dirName = basename(targetDir);
+  const d = new Date();
+  const ts = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}-${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}${String(d.getSeconds()).padStart(2, '0')}`;
+  return `${dirName}-${ts}.txt`;
+}
+
 export default function ScanUI({ options }: ScanUIProps) {
   const [skipIgnored, setSkipIgnored] = useState(options.skipIgnored);
   const [outputFile, setOutputFile] = useState<string | undefined>(options.output);
+  const [saveDir, setSaveDir] = useState(getDefaultSaveDir);
+  const [saveName] = useState(() => getDefaultSaveName(options.targetDir));
 
-  const [configPhase, setConfigPhase] = useState<'ignored' | 'output' | null>(() => {
+  const [configPhase, setConfigPhase] = useState<'ignored' | 'savePrompt' | 'saveDir' | 'saveName' | null>(() => {
     if (options.skipIgnored === undefined) return 'ignored';
-    if (options.output === undefined) return 'output';
+    if (options.output === undefined) return 'savePrompt';
     return null;
   });
 
@@ -53,21 +68,48 @@ export default function ScanUI({ options }: ScanUIProps) {
       {configPhase === 'ignored' && (
         <AskYesNo
           label="Skip git-ignored files? (y/N)"
+          defaultYes={false}
           onAnswer={(val) => {
             setSkipIgnored(val);
             setLog((l) => [...l, `Skip git-ignored files? ${val ? 'Yes' : 'No'}`]);
-            setConfigPhase(options.output === undefined ? 'output' : null);
+            setConfigPhase('savePrompt');
           }}
         />
       )}
-      {configPhase === 'output' && (
-        <AskOutputPath
-          label="Export full report to file (optional, leave empty to skip):"
-          onAnswer={(path) => {
-            setOutputFile(path);
-            setLog((l) => [...l, `Export to file: ${path || '(skipped)'}`]);
+      {configPhase === 'savePrompt' && (
+        <AskYesNo
+          label="Save results to file? (Y/n)"
+          defaultYes={true}
+          onAnswer={(val) => {
+            setLog((l) => [...l, `Save results to file? ${val ? 'Yes' : 'No'}`]);
+            setConfigPhase(val ? 'saveDir' : null);
+          }}
+        />
+      )}
+      {configPhase === 'saveDir' && (
+        <AskPath
+          label="Save directory:"
+          defaultValue={saveDir}
+          onSubmit={(val) => {
+            if (val) setSaveDir(val);
+            setLog((l) => [...l, `Save directory: ${val}`]);
+            setConfigPhase('saveName');
+          }}
+          onSkip={() => setConfigPhase(null)}
+        />
+      )}
+      {configPhase === 'saveName' && (
+        <AskPath
+          label="File name:"
+          defaultValue={saveName}
+          onSubmit={(val) => {
+            const finalName = val || saveName;
+            const fullPath = join(saveDir, finalName);
+            setOutputFile(fullPath);
+            setLog((l) => [...l, `Output file: ${fullPath}`]);
             setConfigPhase(null);
           }}
+          onSkip={() => setConfigPhase(null)}
         />
       )}
       {loading && <Spinner label="Scanning repositories..." />}
@@ -87,32 +129,35 @@ export default function ScanUI({ options }: ScanUIProps) {
           <Box flexDirection="column" marginTop={1}>
             {result.totalRepos === 0 ? (
               <Text color="yellow">No git repositories found in this directory.</Text>
-            ) : (() => {
-              const reposWithFiles = result.repos.filter((r) => r.fileCount > 0);
-              return reposWithFiles.length === 0 ? (
-                <Text color="green">All {result.totalRepos} repositor(ies) are clean!</Text>
-              ) : (
-                reposWithFiles.map((repo) => (
-                  <Box key={repo.repo} flexDirection="column" marginBottom={1}>
-                    <Text color="cyan">
-                      {repo.repo} ({repo.fileCount} untracked)
+            ) : (
+              result.repos.map((repo) => (
+                <Box key={repo.repo} flexDirection="column" marginBottom={1}>
+                  {repo.fileCount > 0 ? (
+                    <>
+                      <Text color="cyan">
+                        {repo.repo} ({repo.fileCount} untracked)
+                      </Text>
+                      {repo.files.slice(0, 10).map((file) => (
+                        <Text key={file} dimColor>
+                          {'  '}
+                          {file}
+                        </Text>
+                      ))}
+                      {repo.files.length > 10 && <Text dimColor> ... and {repo.files.length - 10} more</Text>}
+                    </>
+                  ) : (
+                    <Text color="green">
+                      {repo.repo} (0 untracked)
                     </Text>
-                    {repo.files.slice(0, 10).map((file) => (
-                      <Text key={file} dimColor>
-                        {'  '}
-                        {file}
-                      </Text>
-                    ))}
-                    {repo.files.length > 10 && <Text dimColor> ... and {repo.files.length - 10} more</Text>}
-                    {repo.skippedDirs.length > 0 && (
-                      <Text color="yellow">
-                        {'  '}Skipped dirs: {[...new Set(repo.skippedDirs.map((d) => d.name))].join(', ')}
-                      </Text>
-                    )}
-                  </Box>
-                ))
-              );
-            })()}
+                  )}
+                  {repo.skippedDirs.length > 0 && (
+                    <Text color="yellow">
+                      {'  '}Skipped dirs: {[...new Set(repo.skippedDirs.map((d) => d.name))].join(', ')}
+                    </Text>
+                  )}
+                </Box>
+              ))
+            )}
           </Box>
           {outputFile && <Text color="cyan">Report exported to {outputFile}</Text>}
           {result.skippedDirs.filter((d) => !d.repoPath).length > 0 && (
@@ -167,21 +212,32 @@ export default function ScanUI({ options }: ScanUIProps) {
   );
 }
 
-function AskYesNo({ label, onAnswer }: { label: string; onAnswer: (val: boolean) => void }) {
+function AskYesNo({ label, onAnswer, defaultYes = false }: { label: string; onAnswer: (val: boolean) => void; defaultYes?: boolean }) {
   useInput((ch) => {
     const c = ch.toLowerCase();
     if (c === 'y') onAnswer(true);
-    else if (c === 'n' || c === '\r' || c === '\n') onAnswer(false);
+    else if (c === 'n') onAnswer(false);
+    else if (c === '\r' || c === '\n') onAnswer(defaultYes);
   });
 
   return <Text>{label}</Text>;
 }
 
-function AskOutputPath({ label, onAnswer }: { label: string; onAnswer: (val: string | undefined) => void }) {
-  const [input, setInput] = useState('');
+function AskPath({
+  label,
+  defaultValue,
+  onSubmit,
+  onSkip,
+}: {
+  label: string;
+  defaultValue: string;
+  onSubmit: (val: string) => void;
+  onSkip: () => void;
+}) {
+  const [input, setInput] = useState(defaultValue);
 
   useInput((_input, key) => {
-    if (key.escape) onAnswer(undefined);
+    if (key.escape) onSkip();
   });
 
   return (
@@ -191,8 +247,7 @@ function AskOutputPath({ label, onAnswer }: { label: string; onAnswer: (val: str
         <TextInput
           value={input}
           onChange={setInput}
-          onSubmit={(val) => onAnswer(val.trim() || undefined)}
-          placeholder="/path/to/report.txt"
+          onSubmit={(val) => onSubmit(val.trim() || defaultValue)}
         />
       </Box>
       <Text dimColor>Press Enter to confirm, Esc to skip</Text>
