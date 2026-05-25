@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
-import { getUntrackedFiles, isGitRepo } from '../shared/git.js';
+import { loadGlobalConfig } from '../shared/config.js';
+import { getChangedFiles, isGitRepo } from '../shared/git.js';
 import type { ListOptions } from '../shared/types.js';
 
 export interface ListResult {
@@ -10,7 +11,7 @@ export interface ListResult {
 }
 
 /**
- * Execute the list command: list all untracked files in a git repo.
+ * Execute the list command: list all locally changed files in a git repo.
  */
 export async function runList(options: ListOptions): Promise<ListResult> {
   const { targetDir, skipIgnored } = options;
@@ -22,7 +23,8 @@ export async function runList(options: ListOptions): Promise<ListResult> {
     return { success: false, files: [], error: `Not a git repository: ${targetDir}` };
   }
 
-  const files = await getUntrackedFiles(targetDir, skipIgnored);
+  const config = loadGlobalConfig();
+  const files = await getChangedFiles(targetDir, skipIgnored, [], config.ignoreFiles);
 
   if (options.output) {
     await writeFile(options.output, files.join('\n'), 'utf-8');

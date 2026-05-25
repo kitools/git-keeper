@@ -4,10 +4,24 @@ import { dirname, join } from 'node:path';
 
 export interface Config {
   skipDirs: string[];
+  ignoreFiles: string[];
 }
 
 const DEFAULT_CONFIG: Config = {
-  skipDirs: ['node_modules', 'target', '__pycache__', '.venv', 'venv'],
+  skipDirs: [
+    "node_modules",
+    "dist",
+    ".pnpm",
+    ".npm",
+    ".yarn",
+    ".tanstack",
+    ".next",
+    "target",
+    "__pycache__",
+    ".venv",
+    "venv"
+  ],
+  ignoreFiles: ['.DS_Store', 'Thumbs.db', 'desktop.ini'],
 };
 
 const CONFIG_PATH = join(homedir(), '.git-keeper', 'git-keeper-settings.json');
@@ -26,6 +40,7 @@ export function loadGlobalConfig(): Config {
     }
     const raw = readFileSync(CONFIG_PATH, 'utf-8');
     const parsed = JSON.parse(raw);
+    const result: Config = { ...DEFAULT_CONFIG };
     if (Array.isArray(parsed.skipDirs)) {
       const merged = [...DEFAULT_CONFIG.skipDirs];
       for (const dir of parsed.skipDirs) {
@@ -33,8 +48,16 @@ export function loadGlobalConfig(): Config {
           merged.push(dir);
         }
       }
-      return { skipDirs: merged };
+      result.skipDirs = merged;
     }
+    if (Array.isArray(parsed.ignoreFiles)) {
+      for (const f of parsed.ignoreFiles) {
+        if (typeof f === 'string' && !result.ignoreFiles.includes(f)) {
+          result.ignoreFiles.push(f);
+        }
+      }
+    }
+    return result;
   } catch {
     // Invalid JSON or read error — fall through to defaults
   }

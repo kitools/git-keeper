@@ -7,6 +7,18 @@ import type { NonRepoDir, SkippedDir } from './types.js';
 /**
  * Get the remote URL for origin.
  */
+/**
+ * Check if the repo has a remote named 'origin'.
+ */
+export async function hasRemote(cwd: string): Promise<boolean> {
+  try {
+    const { stdout } = await execa('git', ['remote', 'get-url', 'origin'], { cwd });
+    return stdout.trim().length > 0;
+  } catch {
+    return false;
+  }
+}
+
 export async function getRemoteUrl(cwd: string): Promise<string> {
   const { stdout } = await execa('git', ['remote', 'get-url', 'origin'], { cwd });
   return stdout.trim();
@@ -44,6 +56,46 @@ export async function getUntrackedFiles(cwd: string, skipIgnored = false, exclud
   }
   const { stdout } = await execa('git', args, { cwd });
   return stdout.split('\n').filter(Boolean);
+}
+
+/**
+ * Get all locally changed files via git status --porcelain.
+ * Includes both modified tracked files and untracked files.
+ * @param ignoreFiles - filenames to exclude (matched against basename)
+ */
+export async function getChangedFiles(
+  cwd: string,
+  skipIgnored = false,
+  excludeDirs: string[] = [],
+  ignoreFiles: string[] = [],
+): Promise<string[]> {
+  const args = ['status', '--porcelain', '-uall'];
+  if (!skipIgnored) {
+    args.push('--ignored');
+  }
+  const { stdout } = await execa('git', args, { cwd });
+  const files: string[] = [];
+  for (const line of stdout.split('\n').filter(Boolean)) {
+    const status = line.slice(0, 2);
+    // Ignored entries (!!) — only include when skipIgnored is false
+    if (status === '!!' && skipIgnored) continue;
+
+    let file = line.slice(3);
+    // Handle rename/copy: "R  old -> new"
+    const arrowIdx = file.indexOf(' -> ');
+    if (arrowIdx !== -1) file = file.slice(arrowIdx + 4);
+    // Skip directory entries
+    if (file.endsWith('/')) continue;
+
+    // Filter by excludeDirs — match any path segment
+    if (excludeDirs.some((d) => file.split('/').includes(d))) continue;
+    // Filter by ignoreFiles (match basename)
+    const base = file.split('/').pop() || file;
+    if (ignoreFiles.includes(base)) continue;
+
+    files.push(file);
+  }
+  return files;
 }
 
 /**

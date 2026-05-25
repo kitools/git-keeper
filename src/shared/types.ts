@@ -36,6 +36,7 @@ export interface ScanRepoEntry {
   files: string[];
   fileCount: number;
   skippedDirs: SkippedDir[];
+  hasRemote: boolean;
 }
 
 export interface SkippedDir {

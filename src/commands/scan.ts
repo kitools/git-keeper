@@ -2,26 +2,28 @@ import { existsSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { loadGlobalConfig } from '../shared/config.js';
-import { findGitRepos, getSubmodulePaths, getUntrackedFiles, isGitRepo } from '../shared/git.js';
+import { findGitRepos, getChangedFiles, hasRemote, getSubmodulePaths, isGitRepo } from '../shared/git.js';
 import type { ScanOptions, ScanRepoEntry, ScanResult } from '../shared/types.js';
 
 /**
  * Get untracked files for a repo and all its submodules.
  */
-async function collectRepoUntracked(
+async function collectRepoChanged(
   repoDir: string,
   skipIgnored: boolean | undefined,
   seen: Set<string>,
   excludeDirs: string[] = [],
+  ignoreFiles: string[] = [],
 ): Promise<ScanRepoEntry[]> {
   const results: ScanRepoEntry[] = [];
 
   if (seen.has(repoDir)) return results;
   seen.add(repoDir);
 
-  // Main repo files
-  const files = await getUntrackedFiles(repoDir, skipIgnored, excludeDirs);
-  results.push({ repo: repoDir, files, fileCount: files.length, skippedDirs: [] });
+  // Main repo files — all local changes (modified + untracked)
+  const files = await getChangedFiles(repoDir, skipIgnored, excludeDirs, ignoreFiles);
+  const remote = await hasRemote(repoDir);
+  results.push({ repo: repoDir, files, fileCount: files.length, skippedDirs: [], hasRemote: remote });
 
   // Submodules
   const submodules = await getSubmodulePaths(repoDir);
@@ -31,8 +33,9 @@ async function collectRepoUntracked(
     seen.add(subPath);
 
     if (!(await isGitRepo(subPath))) continue;
-    const subFiles = await getUntrackedFiles(subPath, skipIgnored, excludeDirs);
-    results.push({ repo: subPath, files: subFiles, fileCount: subFiles.length, skippedDirs: [] });
+    const subFiles = await getChangedFiles(subPath, skipIgnored, excludeDirs, ignoreFiles);
+    const subRemote = await hasRemote(subPath);
+    results.push({ repo: subPath, files: subFiles, fileCount: subFiles.length, skippedDirs: [], hasRemote: subRemote });
   }
 
   return results;
@@ -60,12 +63,12 @@ export async function runScan(options: ScanOptions): Promise<ScanResult> {
     options.willingBreadth ?? 500,
   );
 
-  // Collect untracked files for each, with submodule expansion
+  // Collect changed files for each, with submodule expansion
   const seen = new Set<string>();
   const allRepos: ScanRepoEntry[] = [];
 
   for (const repo of repoDirs) {
-    const entries = await collectRepoUntracked(repo, skipIgnored, seen, config.skipDirs);
+    const entries = await collectRepoChanged(repo, skipIgnored, seen, config.skipDirs, config.ignoreFiles);
     for (const entry of entries) {
       // Assign skipped dirs that belong to this repo
       entry.skippedDirs = skippedDirs
@@ -84,7 +87,7 @@ export async function runScan(options: ScanOptions): Promise<ScanResult> {
   if (options.output) {
     const lines: string[] = [];
     for (const repo of allRepos) {
-      lines.push(`[${repo.repo}] (${repo.fileCount} untracked)`);
+      lines.push(`[${repo.repo}] (${repo.fileCount} untracked)${repo.hasRemote ? '' : ' [no remote]'}`);
       for (const file of repo.files) {
         lines.push(`  ${file}`);
       }
@@ -129,7 +132,8 @@ export async function printScanResult(result: ScanResult, options: ScanOptions):
     process.stdout.write(`No git repositories found in: ${options.targetDir}\n`);
   } else {
     for (const repo of result.repos) {
-      process.stdout.write(`[${repo.repo}] ${repo.fileCount} untracked\n`);
+      const noRemote = repo.hasRemote ? '' : ' [no remote]';
+      process.stdout.write(`[${repo.repo}] ${repo.fileCount} untracked${noRemote}\n`);
       for (const file of repo.files.slice(0, 10)) {
         process.stdout.write(`  ${file}\n`);
       }

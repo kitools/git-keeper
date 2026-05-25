@@ -136,6 +136,7 @@ export default function ScanUI({ options }: ScanUIProps) {
                     <>
                       <Text color="cyan">
                         {repo.repo} ({repo.fileCount} untracked)
+                        {!repo.hasRemote && <Text color="yellow"> [no remote]</Text>}
                       </Text>
                       {repo.files.slice(0, 10).map((file) => (
                         <Text key={file} dimColor>
@@ -148,6 +149,7 @@ export default function ScanUI({ options }: ScanUIProps) {
                   ) : (
                     <Text color="green">
                       {repo.repo} (0 untracked)
+                      {!repo.hasRemote && <Text color="yellow"> [no remote]</Text>}
                     </Text>
                   )}
                   {repo.skippedDirs.length > 0 && (
