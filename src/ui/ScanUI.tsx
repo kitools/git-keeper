@@ -5,6 +5,8 @@ import TextInput from 'ink-text-input';
 import { useEffect, useState } from 'react';
 import { runScan } from '../commands/scan.js';
 import type { ScanOptions, ScanResult } from '../shared/types.js';
+import { t } from '../shared/strings.js';
+import type { Lang } from '../shared/strings.js';
 import Spinner from './Spinner.js';
 
 interface ScanUIProps {
@@ -23,12 +25,14 @@ function getDefaultSaveName(targetDir: string): string {
 }
 
 export default function ScanUI({ options }: ScanUIProps) {
+  const [lang, setLang] = useState<Lang>(options.language ?? 'en');
   const [skipIgnored, setSkipIgnored] = useState(options.skipIgnored);
   const [outputFile, setOutputFile] = useState<string | undefined>(options.output);
   const [saveDir, setSaveDir] = useState(getDefaultSaveDir);
   const [saveName] = useState(() => getDefaultSaveName(options.targetDir));
 
-  const [configPhase, setConfigPhase] = useState<'ignored' | 'savePrompt' | 'saveDir' | 'saveName' | null>(() => {
+  const [configPhase, setConfigPhase] = useState<'language' | 'ignored' | 'savePrompt' | 'saveDir' | 'saveName' | null>(() => {
+    if (options.language === undefined) return 'language';
     if (options.skipIgnored === undefined) return 'ignored';
     if (options.output === undefined) return 'savePrompt';
     return null;
@@ -52,6 +56,7 @@ export default function ScanUI({ options }: ScanUIProps) {
       targetDir: options.targetDir,
       skipIgnored: skipIgnored ?? false,
       output: outputFile,
+      language: lang,
     })
       .then((res) => {
         setResult(res);
@@ -61,130 +66,147 @@ export default function ScanUI({ options }: ScanUIProps) {
         setError(err.message);
         setLoading(false);
       });
-  }, [configPhase]);
+  }, [configPhase, lang]);
+
+  const s = t(lang);
 
   const dynamic = (
     <Box flexDirection="column" padding={1}>
+      {configPhase === 'language' && (
+        <AskLang onSelect={(chosen) => {
+          setLang(chosen);
+          setLog((prev) => [...prev, chosen === 'en' ? 'Language: English' : '语言：中文']);
+          setConfigPhase(options.skipIgnored === undefined ? 'ignored' : options.output === undefined ? 'savePrompt' : null);
+        }} />
+      )}
       {configPhase === 'ignored' && (
         <AskYesNo
-          label="Skip git-ignored files? (y/N)"
+          label={s.skipGitIgnored}
           defaultYes={false}
           onAnswer={(val) => {
             setSkipIgnored(val);
-            setLog((l) => [...l, `Skip git-ignored files? ${val ? 'Yes' : 'No'}`]);
-            setConfigPhase('savePrompt');
+            setLog((l) => [...l, `${s.skipGitIgnored} ${val ? s.yes : s.no}`]);
+            setConfigPhase(outputFile === undefined ? 'savePrompt' : null);
           }}
         />
       )}
       {configPhase === 'savePrompt' && (
         <AskYesNo
-          label="Save results to file? (Y/n)"
+          label={s.saveResults}
           defaultYes={true}
           onAnswer={(val) => {
-            setLog((l) => [...l, `Save results to file? ${val ? 'Yes' : 'No'}`]);
+            setLog((l) => [...l, `${s.saveResults} ${val ? s.yes : s.no}`]);
             setConfigPhase(val ? 'saveDir' : null);
           }}
         />
       )}
       {configPhase === 'saveDir' && (
         <AskPath
-          label="Save directory:"
+          label={s.saveDirectory}
           defaultValue={saveDir}
           onSubmit={(val) => {
             if (val) setSaveDir(val);
-            setLog((l) => [...l, `Save directory: ${val}`]);
+            setLog((l) => [...l, `${s.saveDirectory} ${val}`]);
             setConfigPhase('saveName');
           }}
           onSkip={() => setConfigPhase(null)}
+          hint={s.pressEnterConfirm}
         />
       )}
       {configPhase === 'saveName' && (
         <AskPath
-          label="File name:"
+          label={s.fileName}
           defaultValue={saveName}
           onSubmit={(val) => {
             const finalName = val || saveName;
             const fullPath = join(saveDir, finalName);
             setOutputFile(fullPath);
-            setLog((l) => [...l, `Output file: ${fullPath}`]);
+            setLog((l) => [...l, `${s.fileName} ${finalName}`]);
             setConfigPhase(null);
           }}
           onSkip={() => setConfigPhase(null)}
+          hint={s.pressEnterConfirm}
         />
       )}
-      {loading && <Spinner label="Scanning repositories..." />}
+      {loading && <Spinner label={lang === 'zh' ? '正在扫描仓库...' : 'Scanning repositories...'} />}
       {error && (
         <>
           <Text color="red">Error: {error}</Text>
-          <Text dimColor>Press Enter or Esc to exit</Text>
+          <Text dimColor>{s.pressEnterExit}</Text>
         </>
       )}
       {result && (
         <>
           <Box marginTop={1}>
             <Text bold>
-              Found {result.totalRepos} repo source(s), {result.totalUntracked} untracked file(s) total
+              {s.terminalTotal(result.totalRepos, result.totalModifiedTracked, result.totalUntracked)}
             </Text>
           </Box>
           <Box flexDirection="column" marginTop={1}>
             {result.totalRepos === 0 ? (
-              <Text color="yellow">No git repositories found in this directory.</Text>
+              <Text color="yellow">{s.terminalNoRepos(options.targetDir)}</Text>
             ) : (
-              result.repos.map((repo) => (
-                <Box key={repo.repo} flexDirection="column" marginBottom={1}>
-                  {repo.fileCount > 0 ? (
-                    <>
-                      <Text color="cyan">
-                        {repo.repo} ({repo.fileCount} untracked)
-                        {!repo.hasRemote && <Text color="yellow"> [no remote]</Text>}
+              result.repos.map((repo) => {
+                const allFiles = [...repo.modifiedTracked, ...repo.untrackedFiles];
+                const totalFiles = repo.modifiedTracked.length + repo.untrackedFiles.length;
+                const statusEmoji = !repo.hasRemote ? '🟠' : totalFiles > 0 ? '🔴' : '🟢';
+                const statusText = !repo.hasRemote ? s.statusNoRemote
+                  : totalFiles > 0 ? s.statusNeedsReview : s.statusSafeToDelete;
+                return (
+                  <Box key={repo.repo} flexDirection="column" marginBottom={1}>
+                    <Text color={totalFiles > 0 ? 'cyan' : 'green'}>
+                      {repo.repo} {statusEmoji} {statusText}
+                      {repo.remoteUrl ? ` ${repo.remoteUrl}` : ''}
+                    </Text>
+                    {totalFiles > 0 && (
+                      <>
+                        {allFiles.slice(0, 10).map((file) => (
+                          <Text key={file} dimColor>
+                            {'  '}
+                            {file}
+                          </Text>
+                        ))}
+                        {allFiles.length > 10 && <Text dimColor> {s.terminalAndNMore(allFiles.length - 10)}</Text>}
+                      </>
+                    )}
+                    {repo.skippedDirs.length > 0 && (
+                      <Text color="yellow">
+                        {'  '}{s.labelSkippedDirs}: {[...new Set(repo.skippedDirs.map((d) => d.name))].join(', ')}
                       </Text>
-                      {repo.files.slice(0, 10).map((file) => (
-                        <Text key={file} dimColor>
-                          {'  '}
-                          {file}
-                        </Text>
-                      ))}
-                      {repo.files.length > 10 && <Text dimColor> ... and {repo.files.length - 10} more</Text>}
-                    </>
-                  ) : (
-                    <Text color="green">
-                      {repo.repo} (0 untracked)
-                      {!repo.hasRemote && <Text color="yellow"> [no remote]</Text>}
-                    </Text>
-                  )}
-                  {repo.skippedDirs.length > 0 && (
-                    <Text color="yellow">
-                      {'  '}Skipped dirs: {[...new Set(repo.skippedDirs.map((d) => d.name))].join(', ')}
-                    </Text>
-                  )}
-                </Box>
-              ))
+                    )}
+                  </Box>
+                );
+              })
             )}
           </Box>
-          {outputFile && <Text color="cyan">Report exported to {outputFile}</Text>}
+          {outputFile && <Text color="cyan">Exported to {outputFile}</Text>}
           {result.skippedDirs.filter((d) => !d.repoPath).length > 0 && (
             <Box flexDirection="column" marginTop={1}>
               <Text color="yellow">
                 Other skipped: {[...new Set(result.skippedDirs.filter((d) => !d.repoPath).map((d) => d.name))].join(', ')}
               </Text>
-              <Text dimColor> (configured in ~/.git-keeper/git-keeper-settings.json)</Text>
+              <Text dimColor> Configured in ~/.git-keeper/git-keeper-settings.json</Text>
             </Box>
           )}
           {result.nonRepoDirs.length > 0 && (
             <>
               {result.nonRepoDirs.filter((d) => d.reason !== 'no-repo').length > 0 && (
                 <Box flexDirection="column" marginTop={1}>
-                  <Text color="yellow">Non-repo directories (hit limits):</Text>
+                  <Text color="yellow">
+                    {s.nonRepoPartialSearched(result.nonRepoDirs.filter((d) => d.reason !== 'no-repo').length)}
+                  </Text>
                   {result.nonRepoDirs.filter((d) => d.reason !== 'no-repo').map((d) => (
                     <Text key={d.path} dimColor>
-                      {'  '}{d.path} (limit: {d.reason})
+                      {'  '}[{d.reason}] {d.path}
                     </Text>
                   ))}
                 </Box>
               )}
               {result.nonRepoDirs.filter((d) => d.reason === 'no-repo').length > 0 && (
                 <Box flexDirection="column" marginTop={1}>
-                  <Text color="yellow">Non-repo directories:</Text>
+                  <Text color="yellow">
+                    {s.nonRepoFullySearched(result.nonRepoDirs.filter((d) => d.reason === 'no-repo').length)}
+                  </Text>
                   {result.nonRepoDirs.filter((d) => d.reason === 'no-repo').map((d) => (
                     <Text key={d.path} dimColor>
                       {'  '}{d.path}
@@ -195,7 +217,7 @@ export default function ScanUI({ options }: ScanUIProps) {
             </>
           )}
           <Box marginTop={1}>
-            <Text dimColor>Press Enter or Esc to exit</Text>
+            <Text dimColor>{s.pressEnterExit}</Text>
           </Box>
         </>
       )}
@@ -214,6 +236,16 @@ export default function ScanUI({ options }: ScanUIProps) {
   );
 }
 
+function AskLang({ onSelect }: { onSelect: (lang: Lang) => void }) {
+  useInput((ch, key) => {
+    const c = ch.toLowerCase();
+    if (c === 'e' || key.return) onSelect('en');
+    else if (c === 'c') onSelect('zh');
+  });
+
+  return <Text>Language: (E)nglish / (C)hinese? (default English)</Text>;
+}
+
 function AskYesNo({ label, onAnswer, defaultYes = false }: { label: string; onAnswer: (val: boolean) => void; defaultYes?: boolean }) {
   useInput((ch) => {
     const c = ch.toLowerCase();
@@ -230,11 +262,13 @@ function AskPath({
   defaultValue,
   onSubmit,
   onSkip,
+  hint,
 }: {
   label: string;
   defaultValue: string;
   onSubmit: (val: string) => void;
   onSkip: () => void;
+  hint?: string;
 }) {
   const [input, setInput] = useState(defaultValue);
 
@@ -252,7 +286,7 @@ function AskPath({
           onSubmit={(val) => onSubmit(val.trim() || defaultValue)}
         />
       </Box>
-      <Text dimColor>Press Enter to confirm, Esc to skip</Text>
+      {hint && <Text dimColor>{hint}</Text>}
     </Box>
   );
 }

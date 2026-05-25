@@ -2,6 +2,7 @@ import { resolve } from 'node:path';
 import { Box, Text } from 'ink';
 import { useState } from 'react';
 import type { CliParsedArgs } from '../index.js';
+import { t } from '../shared/strings.js';
 import DeleteUI from './DeleteUI.js';
 import ListUI from './ListUI.js';
 import PathInput from './PathInput.js';
@@ -58,8 +59,9 @@ export default function App({ parsed }: AppProps) {
   });
 
   if (!targetDir) {
-    const label =
-      parsed.command === 'scan' ? 'Enter root directory to scan for git repositories:' : 'Enter git repository path:';
+    const lang = parsed.language ?? 'en';
+    const s = t(lang);
+    const label = parsed.command === 'scan' ? s.scanEnterPath : s.listEnterPath;
     return <PathInput onSubmit={(dir) => setTargetDir(normalizeInputPath(dir))} label={label} />;
   }
 
@@ -69,7 +71,7 @@ export default function App({ parsed }: AppProps) {
     case 'delete':
       return <DeleteUI options={{ ...common, deleteDir: parsed.deleteDir, deleteGit: parsed.deleteGit }} />;
     case 'list':
-      return <ListUI options={{ ...common, skipIgnored: parsed.skipIgnored, output: parsed.output }} />;
+      return <ListUI options={{ ...common, skipIgnored: parsed.skipIgnored, output: parsed.output, language: parsed.language }} />;
     case 'scan':
       return (
         <ScanUI
@@ -79,6 +81,7 @@ export default function App({ parsed }: AppProps) {
             output: parsed.output,
             willingDepth: parsed.willingDepth,
             willingBreadth: parsed.willingBreadth,
+            language: parsed.language,
           }}
         />
       );

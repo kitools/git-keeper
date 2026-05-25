@@ -41,26 +41,15 @@ export async function getTrackedFiles(cwd: string): Promise<string[]> {
   return stdout.split('\n').filter(Boolean);
 }
 
-/**
- * Get untracked files via git ls-files --others.
- * @param skipIgnored - If true, only non-ignored untracked files are returned.
- *                      If false (default), ALL untracked files including ignored are returned.
- */
-export async function getUntrackedFiles(cwd: string, skipIgnored = false, excludeDirs: string[] = []): Promise<string[]> {
-  const args = ['ls-files', '--others'];
-  if (skipIgnored) {
-    args.push('--exclude-standard');
-  }
-  for (const dir of excludeDirs) {
-    args.push('--exclude', `${dir}/`);
-  }
-  const { stdout } = await execa('git', args, { cwd });
-  return stdout.split('\n').filter(Boolean);
+export interface ChangedFilesResult {
+  modifiedTracked: string[];
+  untracked: string[];
+  ignored: string[];
 }
 
 /**
- * Get all locally changed files via git status --porcelain.
- * Includes both modified tracked files and untracked files.
+ * Get all locally changed files via git status --porcelain, split by status.
+ * Returns modified tracked files, untracked files, and ignored files separately.
  * @param ignoreFiles - filenames to exclude (matched against basename)
  */
 export async function getChangedFiles(
@@ -68,34 +57,41 @@ export async function getChangedFiles(
   skipIgnored = false,
   excludeDirs: string[] = [],
   ignoreFiles: string[] = [],
-): Promise<string[]> {
+): Promise<ChangedFilesResult> {
   const args = ['status', '--porcelain', '-uall'];
   if (!skipIgnored) {
     args.push('--ignored');
   }
   const { stdout } = await execa('git', args, { cwd });
-  const files: string[] = [];
+  const result: ChangedFilesResult = { modifiedTracked: [], untracked: [], ignored: [] };
+
+  function acceptFile(file: string): boolean {
+    // Skip directory entries
+    if (file.endsWith('/')) return false;
+    // Filter by excludeDirs — match any path segment
+    if (excludeDirs.some((d) => file.split('/').includes(d))) return false;
+    // Filter by ignoreFiles (match basename)
+    const base = file.split('/').pop() || file;
+    if (ignoreFiles.includes(base)) return false;
+    return true;
+  }
+
   for (const line of stdout.split('\n').filter(Boolean)) {
     const status = line.slice(0, 2);
-    // Ignored entries (!!) — only include when skipIgnored is false
-    if (status === '!!' && skipIgnored) continue;
-
     let file = line.slice(3);
     // Handle rename/copy: "R  old -> new"
     const arrowIdx = file.indexOf(' -> ');
     if (arrowIdx !== -1) file = file.slice(arrowIdx + 4);
-    // Skip directory entries
-    if (file.endsWith('/')) continue;
 
-    // Filter by excludeDirs — match any path segment
-    if (excludeDirs.some((d) => file.split('/').includes(d))) continue;
-    // Filter by ignoreFiles (match basename)
-    const base = file.split('/').pop() || file;
-    if (ignoreFiles.includes(base)) continue;
-
-    files.push(file);
+    if (status === '??') {
+      if (acceptFile(file)) result.untracked.push(file);
+    } else if (status === '!!') {
+      if (!skipIgnored && acceptFile(file)) result.ignored.push(file);
+    } else {
+      if (acceptFile(file)) result.modifiedTracked.push(file);
+    }
   }
-  return files;
+  return result;
 }
 
 /**

@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import { loadGlobalConfig } from '../shared/config.js';
 import { getChangedFiles, isGitRepo } from '../shared/git.js';
+import { t } from '../shared/strings.js';
 import type { ListOptions } from '../shared/types.js';
 
 export interface ListResult {
@@ -24,7 +25,8 @@ export async function runList(options: ListOptions): Promise<ListResult> {
   }
 
   const config = loadGlobalConfig();
-  const files = await getChangedFiles(targetDir, skipIgnored, [], config.ignoreFiles);
+  const changed = await getChangedFiles(targetDir, skipIgnored, [], config.ignoreFiles);
+  const files = [...changed.modifiedTracked, ...changed.untracked, ...changed.ignored];
 
   if (options.output) {
     await writeFile(options.output, files.join('\n'), 'utf-8');
@@ -37,6 +39,9 @@ export async function runList(options: ListOptions): Promise<ListResult> {
  * Non-interactive output for list command.
  */
 export async function printListResult(result: ListResult, options: ListOptions): Promise<void> {
+  const lang = options.language ?? 'en';
+  const s = t(lang);
+
   if (!result.success) {
     process.stderr.write(`Error: ${result.error}\n`);
     process.exit(1);
@@ -44,7 +49,7 @@ export async function printListResult(result: ListResult, options: ListOptions):
   }
 
   if (options.output) {
-    process.stdout.write(`Wrote ${result.files.length} file(s) to ${options.output}\n`);
+    process.stdout.write(`${s.wroteFiles(result.files.length, options.output)}\n`);
     return;
   }
 

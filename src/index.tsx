@@ -15,6 +15,7 @@ export interface CliParsedArgs {
   output?: string;
   willingDepth?: number;
   willingBreadth?: number;
+  language?: 'en' | 'zh';
 }
 
 function showHelp(): void {
@@ -39,6 +40,7 @@ OPTIONS
   --output <file>          (list, scan) Write output to file
   --willing-depth <n>      (scan) Max depth to search for repos from non-repo dirs (default 3)
   --willing-breadth <n>    (scan) Max sibling subdirs to check from a non-repo dir (default 500)
+  --lang <en|zh>           Language for output text (default en)
   -h, --help               Show this help
 
 EXAMPLES
@@ -94,6 +96,13 @@ function parseArgs(): CliParsedArgs | null {
       parsed.willingDepth = Number(args[++i]);
     } else if (arg === '--willing-breadth' && i + 1 < args.length) {
       parsed.willingBreadth = Number(args[++i]);
+    } else if (arg === '--lang' && i + 1 < args.length) {
+      const val = args[++i];
+      if (val !== 'en' && val !== 'zh') {
+        process.stderr.write(`Invalid language: ${val}. Use en or zh.\n`);
+        process.exit(1);
+      }
+      parsed.language = val;
     } else {
       process.stderr.write(`Unknown option: ${arg}\n`);
       process.exit(1);
@@ -143,11 +152,13 @@ async function main(): Promise<void> {
         targetDir,
         skipIgnored: parsed.skipIgnored ?? false,
         output: parsed.output,
+        language: parsed.language,
       });
       await printListResult(result, {
         targetDir,
         skipIgnored: parsed.skipIgnored ?? false,
         output: parsed.output,
+        language: parsed.language,
       });
       break;
     }
@@ -158,11 +169,13 @@ async function main(): Promise<void> {
         output: parsed.output,
         willingDepth: parsed.willingDepth,
         willingBreadth: parsed.willingBreadth,
+        language: parsed.language,
       });
       await printScanResult(result, {
         targetDir,
         skipIgnored: parsed.skipIgnored ?? false,
         output: parsed.output,
+        language: parsed.language,
       });
       break;
     }

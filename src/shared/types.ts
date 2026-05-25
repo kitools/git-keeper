@@ -11,6 +11,7 @@ export interface ListOptions {
   /** undefined = prompt user; true/false = explicit choice */
   skipIgnored?: boolean;
   output?: string;
+  language?: 'en' | 'zh';
 }
 
 export interface ScanOptions {
@@ -20,6 +21,7 @@ export interface ScanOptions {
   output?: string;
   willingDepth?: number;
   willingBreadth?: number;
+  language?: 'en' | 'zh';
 }
 
 export interface DeleteResult {
@@ -33,10 +35,12 @@ export interface DeleteResult {
 
 export interface ScanRepoEntry {
   repo: string;
-  files: string[];
+  modifiedTracked: string[];
+  untrackedFiles: string[];
   fileCount: number;
   skippedDirs: SkippedDir[];
   hasRemote: boolean;
+  remoteUrl: string;
 }
 
 export interface SkippedDir {
@@ -53,6 +57,7 @@ export interface NonRepoDir {
 export interface ScanResult {
   repos: ScanRepoEntry[];
   totalRepos: number;
+  totalModifiedTracked: number;
   totalUntracked: number;
   skippedDirs: SkippedDir[];
   nonRepoDirs: NonRepoDir[];

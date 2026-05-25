@@ -3,6 +3,8 @@ import TextInput from 'ink-text-input';
 import { useEffect, useState } from 'react';
 import { runList } from '../commands/list.js';
 import type { ListOptions } from '../shared/types.js';
+import { t } from '../shared/strings.js';
+import type { Lang } from '../shared/strings.js';
 import Spinner from './Spinner.js';
 
 interface ListUIProps {
@@ -10,10 +12,12 @@ interface ListUIProps {
 }
 
 export default function ListUI({ options }: ListUIProps) {
+  const [lang, setLang] = useState<Lang>(options.language ?? 'en');
   const [skipIgnored, setSkipIgnored] = useState(options.skipIgnored);
   const [outputFile, setOutputFile] = useState<string | undefined>(options.output);
 
-  const [configPhase, setConfigPhase] = useState<'ignored' | 'output' | null>(() => {
+  const [configPhase, setConfigPhase] = useState<'language' | 'ignored' | 'output' | null>(() => {
+    if (options.language === undefined) return 'language';
     if (options.skipIgnored === undefined) return 'ignored';
     if (options.output === undefined) return 'output';
     return null;
@@ -33,7 +37,7 @@ export default function ListUI({ options }: ListUIProps) {
   useEffect(() => {
     if (configPhase !== null || loading || result || error) return;
     setLoading(true);
-    runList({ targetDir: options.targetDir, skipIgnored: skipIgnored ?? false, output: outputFile })
+    runList({ targetDir: options.targetDir, skipIgnored: skipIgnored ?? false, output: outputFile, language: lang })
       .then((res) => {
         setResult(res);
         setLoading(false);
@@ -42,38 +46,47 @@ export default function ListUI({ options }: ListUIProps) {
         setError(err.message);
         setLoading(false);
       });
-  }, [configPhase]);
+  }, [configPhase, lang]);
+
+  const s = t(lang);
 
   const dynamic = (
     <Box flexDirection="column" padding={1}>
-      {/* Current interactive or result content */}
+      {configPhase === 'language' && (
+        <AskLang onSelect={(l) => {
+          setLang(l);
+          setLog((ls) => [...ls, l === 'en' ? 'Language: English' : '语言：中文']);
+          setConfigPhase(options.skipIgnored === undefined ? 'ignored' : options.output === undefined ? 'output' : null);
+        }} />
+      )}
       {configPhase === 'ignored' && (
         <AskYesNo
-          label="Skip git-ignored files? (y/N)"
+          label={s.skipGitIgnored}
           onAnswer={(val) => {
             setSkipIgnored(val);
-            setLog((l) => [...l, `Skip git-ignored files? ${val ? 'Yes' : 'No'}`]);
+            setLog((l) => [...l, `${s.skipGitIgnored} ${val ? s.yes : s.no}`]);
             setConfigPhase(options.output === undefined ? 'output' : null);
           }}
         />
       )}
       {configPhase === 'output' && (
         <Box flexDirection="column">
-          <Text>Export file list to file? (optional, leave empty to skip):</Text>
+          <Text>{s.listOutputPrompt}</Text>
           <OutputPathInput
             onSubmit={(path) => {
               setOutputFile(path);
-              setLog((l) => [...l, `Export to file: ${path || '(skipped)'}`]);
+              setLog((l) => [...l, `${s.listOutputPrompt} ${path || '(skipped)'}`]);
               setConfigPhase(null);
             }}
+            hint={s.pressEnterConfirm}
           />
         </Box>
       )}
-      {loading && <Spinner label="Scanning untracked files..." />}
+      {loading && <Spinner label={lang === 'zh' ? '正在扫描未跟踪文件...' : 'Scanning untracked files...'} />}
       {error && (
         <>
           <Text color="red">Error: {error}</Text>
-          <Text dimColor>Press Enter or Esc to exit</Text>
+          <Text dimColor>{s.pressEnterExit}</Text>
         </>
       )}
       {result &&
@@ -81,8 +94,7 @@ export default function ListUI({ options }: ListUIProps) {
           <>
             <Box marginTop={1}>
               <Text bold>
-                Found {result.files.length} untracked file{result.files.length !== 1 ? 's' : ''}
-                {skipIgnored ? ' (excluding git-ignored)' : ''}
+                {s.foundNFiles(result.files.length, skipIgnored ?? false)}
               </Text>
             </Box>
             <Box flexDirection="column" marginTop={1}>
@@ -92,18 +104,18 @@ export default function ListUI({ options }: ListUIProps) {
                 </Text>
               ))}
               {result.files.length > 100 && (
-                <Text dimColor>... and {result.files.length - 100} more (use export to see all)</Text>
+                <Text dimColor>{s.andNMoreList(result.files.length - 100)}</Text>
               )}
             </Box>
-            {outputFile && <Text color="cyan">Exported to {outputFile}</Text>}
+            {outputFile && <Text color="cyan">{s.exportedTo(outputFile)}</Text>}
             <Box marginTop={1}>
-              <Text dimColor>Press Enter or Esc to exit</Text>
+              <Text dimColor>{s.pressEnterExit}</Text>
             </Box>
           </>
         ) : (
           <>
             <Text color="red">Error: {result.error}</Text>
-            <Text dimColor>Press Enter or Esc to exit</Text>
+            <Text dimColor>{s.pressEnterExit}</Text>
           </>
         ))}
     </Box>
@@ -121,6 +133,16 @@ export default function ListUI({ options }: ListUIProps) {
   );
 }
 
+function AskLang({ onSelect }: { onSelect: (lang: Lang) => void }) {
+  useInput((ch, key) => {
+    const c = ch.toLowerCase();
+    if (c === 'e' || key.return) onSelect('en');
+    else if (c === 'c') onSelect('zh');
+  });
+
+  return <Text>Language: (E)nglish / (C)hinese? (default English)</Text>;
+}
+
 function AskYesNo({ label, onAnswer }: { label: string; onAnswer: (val: boolean) => void }) {
   useInput((ch) => {
     const c = ch.toLowerCase();
@@ -131,7 +153,7 @@ function AskYesNo({ label, onAnswer }: { label: string; onAnswer: (val: boolean)
   return <Text>{label}</Text>;
 }
 
-function OutputPathInput({ onSubmit }: { onSubmit: (val: string | undefined) => void }) {
+function OutputPathInput({ onSubmit, hint }: { onSubmit: (val: string | undefined) => void; hint?: string }) {
   const [input, setInput] = useState('');
 
   useInput((_input, key) => {
@@ -146,7 +168,7 @@ function OutputPathInput({ onSubmit }: { onSubmit: (val: string | undefined) => 
         onSubmit={(val) => onSubmit(val.trim() || undefined)}
         placeholder="/path/to/output.txt"
       />
-      <Text dimColor>Press Enter to confirm, Esc to skip</Text>
+      {hint && <Text dimColor>{hint}</Text>}
     </Box>
   );
 }
