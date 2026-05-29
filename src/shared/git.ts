@@ -34,6 +34,20 @@ export async function isGitClean(cwd: string): Promise<boolean> {
 }
 
 /**
+ * Check if all local commits have been pushed to the remote tracking branch.
+ * Returns false if no upstream branch is configured or if there are unpushed commits.
+ */
+export async function isSyncedToRemote(cwd: string): Promise<boolean> {
+  try {
+    const { stdout } = await execa('git', ['rev-list', '--count', '@{u}..HEAD'], { cwd });
+    return Number(stdout.trim()) === 0;
+  } catch {
+    // No upstream branch configured, or other git error
+    return false;
+  }
+}
+
+/**
  * Get all tracked files via git ls-files.
  */
 export async function getTrackedFiles(cwd: string): Promise<string[]> {

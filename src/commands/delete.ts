@@ -6,6 +6,7 @@ import {
   getRemoteUrl,
   getTrackedFiles,
   isGitClean,
+  isSyncedToRemote,
   isGitRepo,
   writeRemoteFile,
 } from '../shared/git.js';
@@ -35,6 +36,11 @@ export async function runDelete(options: DeleteOptions): Promise<DeleteResult> {
   // 2. Check no uncommitted changes
   if (!(await isGitClean(targetDir))) {
     return { success: false, error: 'Repository has uncommitted changes. Please commit or stash first.' };
+  }
+
+  // 3. Check all commits are pushed to remote
+  if (!(await isSyncedToRemote(targetDir))) {
+    return { success: false, error: 'Local commits have not been pushed to remote. Please push first.' };
   }
 
   // 3. Write remote URL to file
